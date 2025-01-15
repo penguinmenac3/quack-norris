@@ -1,0 +1,8 @@
+[
+    {
+        "api_key": "test_key",
+        "selected_chat": "global",
+        "workdir": "data",
+        "data_sources": []
+    }
+]
