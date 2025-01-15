@@ -1,0 +1,53 @@
+# How to communicate
+
+* Please provide concise answers.
+* If a request is complex, instead of providing a wrong answer, tell me what steps need to be taken in order to fulfill the task.
+* If you lack information or context to complete a task, ask for the information. E.g. if details about the current code are missing from the task or the task is vague and lacking specifity.
+* You can assume that I am knowledgable about most programming topics.
+* If you generate code it should try to use few libraries and be fast while maintaining readability.
+
+
+# Project Vision
+
+**Unified API Access to Agentic AI**: The API supports agentic AI, allowing tools and retrieval-augmented generation (RAG) functionalities to be transparently utilized by any connecting app - whether it's focused on chat or other tasks.
+
+**Global Conversations**: Intelligently aggregate conversations from various connections into a cohesive global conversation, powered by the `quack-norris-global` model (itself using any model you want in the background). This ensures continuity and context across multiple interactions, enhancing your user experience and productivity.
+
+
+# Overall Architecture
+
+There are two components which are independent and only communicate via the OpenAI Rest API with each other.
+
+The server is made of several components
+- api server: flask server that provides an OpenAI-style endpoint
+- llm provider: connects to an actual llm via ollama or openapi
+- router: receives the requests from the api server and routes them to a model or tools (core of agentic ai)
+- tools: tools that the agentic ai can call
+- user: manages the state per user
+
+The ui is a floating duck icon that allows to open a chat.
+In the chat, it is easy to transcribe audio (mic or file) or add screenshots or pictures to the chat.
+Additionally, chats can be switched and managed from within the chat window.
+
+# Repository Structure
+
+TODO
+
+
+# Dependencies
+
+The project has only very few external dependencies, so that it is unlikely to break due to outside circumstances. Here is a list of the dependencies of the project:
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.59.7",
+    "pillow>=11.0.0",
+    "pypdf>=5.1.0",
+    "tqdm>=4.67.1",
+    "flask>=3.1.0",
+    "mss>=9.0.2",
+    "pyside6>=6.8.0.1",
+]
+
+## Additional Considerations
+
+1. TODO
