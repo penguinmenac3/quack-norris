@@ -6,10 +6,10 @@ from flask import Flask, request
 from quack_norris.server._types import Message
 from quack_norris.server.user import get_users, User
 from quack_norris.server.router import router
-from quack_norris.config import read_config
 
 
 app = Flask(__name__)
+
 
 def require_auth(func):
     @wraps(func)
@@ -34,7 +34,7 @@ def embeddings(user: User):
         inputs = [inputs]
 
     response = router.embeddings(model, inputs, data, user)
-    
+
     embeds = response.embeds
     if len(embeds) == 1:
         embeds = embeds[0]

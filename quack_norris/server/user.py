@@ -5,6 +5,7 @@ from quack_norris.config import read_config, write_config
 
 
 USER_CONFIG_NAME = "users.json"
+_users = None
 
 
 class User(NamedTuple):
@@ -14,7 +15,6 @@ class User(NamedTuple):
     data_sources: list[str]  # where the AI can read
 
 
-_users = None
 def get_users() -> dict[str, User]:
     global _users
     if _users is None:

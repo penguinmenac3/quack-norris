@@ -7,7 +7,7 @@ from quack_norris.config import read_config
 
 def ui():
     parser = ArgumentParser("quack-norris-ui")
-    args = parser.parse_args()
+    _ = parser.parse_args()
     raise NotImplementedError()
 
 

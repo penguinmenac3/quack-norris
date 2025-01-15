@@ -22,6 +22,10 @@ ui = [
     "mss>=9.0.2",
     "pyside6>=6.8.0.1",
 ]
+dev = [
+    "flake8>=7.1.1",
+    "pytest>=8.3.4"
+]
 
 [project.scripts]
 quack-norris = "quack_norris.__main__:main"

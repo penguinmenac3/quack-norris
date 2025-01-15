@@ -2,13 +2,14 @@ import os
 from openai import OpenAI as _OpenAIAPI
 from quack_norris.server._types import TextResponse, EmbedResponse, Message
 
+
 class LlmProvider(object):
     def chat(self, model: str, messages: list[Message]) -> TextResponse:
         raise NotImplementedError("Must be implemented by subclass!")
-    
+
     def complete(self, model: str, prompt: str) -> TextResponse:
         raise NotImplementedError("Must be implemented by subclass!")
-    
+
     def embed(self, model: str, inputs: list[str]) -> EmbedResponse:
         raise NotImplementedError("Must be implemented by subclass!")
 
@@ -28,7 +29,7 @@ class OpenAIProvider(LlmProvider):
             finish_reason=response.choices[0].content,
             result=response.choices[0].message.content,
         )
-    
+
     def complete(self, model: str, prompt: str) -> TextResponse:
         response = self._client.completions.create(
             model=model,
@@ -40,7 +41,7 @@ class OpenAIProvider(LlmProvider):
             finish_reason=response.choices[0].content,
             result=response.choices[0].text,
         )
-    
+
     def embed(self, model: str, inputs: list[str]) -> EmbedResponse:
         response = self._client.embeddings.create(
             model=model,

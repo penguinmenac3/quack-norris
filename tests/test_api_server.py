@@ -6,8 +6,11 @@ import time
 
 from quack_norris.server.llm_provider import OpenAIProvider, Message
 
+os.chdir(os.path.dirname(__file__))
+
 # Store the process ID of the test server
 test_server_process = None
+
 
 def start_test_server():
     global test_server_process
@@ -15,6 +18,7 @@ def start_test_server():
     test_server_process = subprocess.Popen(['quack-norris-server'], shell=True)
     print(f"Test server started with PID: {test_server_process.pid}")
     time.sleep(1)
+
 
 def stop_test_server():
     global test_server_process
