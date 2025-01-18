@@ -26,7 +26,7 @@ class OpenAIProvider(LlmProvider):
         return TextResponse(
             prompt_tokens=response.usage.prompt_tokens,
             total_tokens=response.usage.total_tokens,
-            finish_reason=response.choices[0].content,
+            finish_reason=response.choices[0].finish_reason,
             result=response.choices[0].message.content,
         )
 
@@ -38,7 +38,7 @@ class OpenAIProvider(LlmProvider):
         return TextResponse(
             prompt_tokens=response.usage.prompt_tokens,
             total_tokens=response.usage.total_tokens,
-            finish_reason=response.choices[0].content,
+            finish_reason=response.choices[0].finish_reason,
             result=response.choices[0].text,
         )
 
@@ -56,4 +56,4 @@ class OpenAIProvider(LlmProvider):
 
 class OllamaProvider(OpenAIProvider):
     def __init__(self, base_url='http://localhost:11434'):
-        super().__init__(base_url=os.path.join(base_url, "v1"), api_key='ollama')
+        super().__init__(base_url=os.path.join(base_url, "v1").replace("\\", "/"), api_key='ollama')
