@@ -16,8 +16,9 @@ def server():
     config = read_config("server.json")
     parser.add_argument("--host", required=False, default=config["host"], help="A host to overwrite the config temporarily.")
     parser.add_argument("--port", required=False, default=config["port"], help="A port to overwrite the config temporarily.")
+    parser.add_argument("--debug", action="store_true", help="Run the flask server in debug mode.")
     args = parser.parse_args()
-    _api_server(host=args.host, port=args.port)
+    _api_server(host=args.host, port=args.port, debug=args.debug)
 
 
 def main():
