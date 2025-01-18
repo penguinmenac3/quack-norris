@@ -2,6 +2,7 @@ from uuid import uuid4
 from time import time
 from functools import wraps
 from flask import Flask, request
+from waitress import serve
 
 from quack_norris.server._types import Message
 from quack_norris.server.user import get_users, User
@@ -121,5 +122,9 @@ def chat_completions(user: User):
     }
 
 
-def main(host: str, port: int):
-    app.run(host, port)
+def main(host: str, port: int, debug: bool):
+    if debug:
+        app.run(host, port, debug=debug)
+    else:
+        print(f"Starting API server on http://{host}:{port}")
+        serve(app, host=host, port=port)
