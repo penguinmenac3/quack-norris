@@ -13,15 +13,17 @@ app = Flask(__name__)
 
 def require_auth(func):
     @wraps(func)
-    def decorated(*args, **kwargs):
+    def decorator(*args, **kwargs):
         api_token = request.headers.get("Authorization")
         if api_token is None:
-            return "Invalid Authentication", 401
+            return "Invalid Authentication (No token provided)", 401
+        if api_token.startswith("Bearer"):
+            api_token = " ".join(api_token.split(" ")[1:])
         user = get_users().get(api_token, None)
         if user is None:
-            return "Invalid Authentication", 401
-        return func(*args, user=user, **kwargs)
-    return decorated
+            return "Invalid Authentication (Invalid token provided)", 401
+        return func(user, *args, **kwargs)
+    return decorator
 
 
 @app.route("/v1/embeddings", methods=["POST"])
