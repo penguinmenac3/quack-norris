@@ -37,11 +37,12 @@ def stop_test_server():
 
 class TestAPIServer(unittest.TestCase):
     def setUp(self):
-        start_test_server()
-        self.client = OpenAIProvider(base_url="http://localhost:11337", api_key="test_key")
+        # start_test_server()
+        self.client = OpenAIProvider(base_url="http://localhost:11337/v1", api_key="test_key")
 
     def tearDown(self):
-        stop_test_server()
+        # stop_test_server()
+        pass
 
     def test_chat(self):
         messages = [
