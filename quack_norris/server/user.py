@@ -1,7 +1,7 @@
 import json
 from typing import NamedTuple
 
-from quack_norris.config import read_config, write_config
+from quack_norris.common.config import read_config, write_config
 
 
 USER_CONFIG_NAME = "users.json"

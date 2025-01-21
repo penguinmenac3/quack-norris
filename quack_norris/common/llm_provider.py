@@ -1,6 +1,6 @@
 import os
 from openai import OpenAI as _OpenAIAPI
-from quack_norris.server._types import TextResponse, EmbedResponse, Message
+from quack_norris.common._types import TextResponse, EmbedResponse, Message
 
 
 class LlmProvider(object):

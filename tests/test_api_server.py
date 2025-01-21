@@ -4,7 +4,7 @@ import signal
 import os
 import time
 
-from quack_norris.server.llm_provider import OpenAIProvider, Message
+from quack_norris.common.llm_provider import OpenAIProvider, Message
 
 os.chdir(os.path.dirname(__file__))
 
@@ -14,7 +14,10 @@ test_server_process = None
 
 def start_test_server():
     global test_server_process
-    # Start "quack-norris-server"
+    # skip on windows (killing is bugged)
+    if os.name == 'nt':
+        return
+    # Start "quak-norris-server"
     test_server_process = subprocess.Popen(['quack-norris-server'], shell=True)
     print(f"Test server started with PID: {test_server_process.pid}")
     time.sleep(1)
@@ -37,12 +40,11 @@ def stop_test_server():
 
 class TestAPIServer(unittest.TestCase):
     def setUp(self):
-        # start_test_server()
+        start_test_server()
         self.client = OpenAIProvider(base_url="http://localhost:11337/v1", api_key="test_key")
 
     def tearDown(self):
-        # stop_test_server()
-        pass
+        stop_test_server()
 
     def test_chat(self):
         messages = [
@@ -51,5 +53,5 @@ class TestAPIServer(unittest.TestCase):
             Message("assistant", "The LA Dodgers won in 2020."),
             Message("user", "Where was it played?"),
         ]
-        response = self.client.chat(model="qwen2.5-coder:1.5b", messages=messages)
+        response = self.client.chat(model="qwen2.5-coder:1.5b-base", messages=messages)
         print(response)

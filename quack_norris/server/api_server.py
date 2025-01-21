@@ -4,7 +4,7 @@ from functools import wraps
 from flask import Flask, request
 from waitress import serve
 
-from quack_norris.server._types import Message
+from quack_norris.common._types import Message
 from quack_norris.server.user import get_users, User
 from quack_norris.server.router import router
 

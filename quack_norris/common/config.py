@@ -3,9 +3,9 @@ import json
 
 
 def read_config(config_name: str) -> any:
-    home_config_path = os.path.expanduser("~/.config/quack_norris/")
+    home_config_path = os.path.expanduser("~/.config/quack_norris/").replace("/", os.sep)
     user_home_config_path = os.path.join(home_config_path, config_name)
-    code_home_config_path = os.path.join(os.path.dirname(__file__), "configs", config_name)
+    code_home_config_path = os.path.join(os.path.dirname(__file__), "..", "configs", config_name)
     path = ""
     if os.path.exists(config_name):
         path = config_name
@@ -15,7 +15,10 @@ def read_config(config_name: str) -> any:
         path = code_home_config_path
     else:
         print(f"FAILED to find config: {config_name}")
-        raise FileNotFoundError(f"Config not found anywhere: {config_name}")
+        raise FileNotFoundError(
+            "Config not found anywhere:\n"
+            + f"  {config_name}\n  {user_home_config_path}\n  {code_home_config_path}"
+        )
     print(f"Reading Config: {path}")
 
     with open(path, "r", encoding="utf-8") as f:
