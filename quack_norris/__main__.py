@@ -2,12 +2,11 @@ import sys
 from setproctitle import setproctitle
 from argparse import ArgumentParser
 
-from quack_norris.server.api_server import main as _api_server
-from quack_norris.ui.app import main as _create_ui
 from quack_norris.common.config import read_config
 
 
 def ui():
+    from quack_norris.ui.app import main as _create_ui
     setproctitle("quack-norris-ui")
     parser = ArgumentParser("quack-norris-ui")
     config = read_config("ui.json")
@@ -35,6 +34,7 @@ def ui():
 
 
 def server():
+    from quack_norris.server.api_server import main as _api_server
     setproctitle("quack-norris-server")
     parser = ArgumentParser("quack-norris-server")
     config = read_config("server.json")
