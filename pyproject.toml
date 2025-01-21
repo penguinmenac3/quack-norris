@@ -31,7 +31,7 @@ dev = [
 
 [project.scripts]
 quack-norris = "quack_norris.__main__:main"
-quack-norris-ui = "quack_norris.__main__:ui"
+quack-norris-ui = "quack_norris.__ui_without_terminal__:ui"
 quack-norris-server = "quack_norris.__main__:server"
 
 [build-system]
