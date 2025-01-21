@@ -9,7 +9,7 @@
 
 # Project Vision
 
-**Unified API Access to Agentic AI**: The API supports agentic AI, allowing tools and retrieval-augmented generation (RAG) functionalities to be transparently utilized by any connecting app - whether it's focused on chat or other tasks.
+**Unified API Access to Agentic AI**: The API supports agentic AI, allowing tools and retrieval-augmented generation (RAG) functionalities to be transparently utilized by any connecting app - whether it is focused on chat or other tasks.
 
 **Global Conversations**: Intelligently aggregate conversations from various connections into a cohesive global conversation, powered by the `quack-norris-global` model (itself using any model you want in the background). This ensures continuity and context across multiple interactions, enhancing your user experience and productivity.
 
@@ -18,20 +18,92 @@
 
 There are two components which are independent and only communicate via the OpenAI Rest API with each other.
 
-The server is made of several components
+## Server
 - api server: flask server that provides an OpenAI-style endpoint
 - llm provider: connects to an actual llm via ollama or openapi
 - router: receives the requests from the api server and routes them to a model or tools (core of agentic ai)
 - tools: tools that the agentic ai can call
 - user: manages the state per user
 
-The ui is a floating duck icon that allows to open a chat.
-In the chat, it is easy to transcribe audio (mic or file) or add screenshots or pictures to the chat.
-Additionally, chats can be switched and managed from within the chat window.
+### Server-API
+The server exposes an OpenAI style API for you to use in other tools as well.
+However, to access all features, you need to know the following:
+* `model = "quack-norris"` uses whatever is selected by quack norris (user, agent or router)
+  - `model = "quack-norris:code"` hints that we prefer a code savy model
+* `model = "quack-norris-global"` (and variants) use the same conversation accross all connections (not per connection)
+  - allows you to have a conversation across multiple applications (breaking boundaries between your IDE and quack-norris-ui)
+  - `quack-norris-ui` uses the global model by default
+* `/cmd` - slash-commands allow you to interact with the server instead of the model (returns the response of the command instead of a model response)
+  - `/fetch` gets the messages in the chat since your last message
+  - `/new [name]` starts a new chat with the model using the (optional) name (use timestamp as name for unnamed chats)
+  - `/clear` is an alias for `/new`
+  - `/rename name` rename the current conversation to a new name
+  - `/select name` change to another conversation
+  - `/model modelname` change the model of the conversation (e.g. `/model llama3.2:7b`)
+  - `/list` list all available conversations
+
+## UI
+The UI connects to the server using the OpenAI-API with the extra commands.
+It does not store or manage chats locally, but relies on the server to provide the required data.
+- floating duck icon (launcher)
+  * Behavior: A small, draggable floating duck icon appears on the screen at all times.
+    - Double-clicking the duck opens the chat window.
+    - Clicking and dragging allows users to reposition the duck anywhere on the screen.
+  * Purpose: Serves as a quick entry point for initiating conversations.
+- Chat Window
+  * Opening: The chat window appears when the duck is double-clicked.
+  * Closing: The chat window disappears when the duck is double-clicked.
+  * Layout:
+    - The chat window is always positioned relative to the duck
+      * if the duck is in the top right area, it is to the left and down
+      * if the duck is in the bottom right area, it is to the left and up
+      * etc. for the other screen quadrants
+    - Clean, modern design with message bubbles that distinguish between user and AI messages.
+    - Text-based messages are easy to read and well-formatted.
+    - Supports rich media embedding (images, audio files) inline within chat messages.
+  * Features:
+    - Message input area at the bottom with a text box for typing.
+    - File drag-and-drop zone: Users can drag and drop images or files directly into the chat window to add them as attachments.
+    - File attachment button: A button that allows to attach files (images, PDFs, etc.) to messages.
+    - Clipboard integration: If an image is in the clipboard (e.g., screenshot), the user can paste it (CTRL + V) as an attachment to the chat message.
+    - Supports audio transcription: Clicking a button toggles "audio call mode", where speech is transcribed into the text message box in real-time and responses are spoken aloud using text-to-speech (TTS).
+    - A dropdown menu allows switching the conversation (chat history), deleting and creating new ones.
+    - A dropdown menu allows switching the llm-model of a conversation
+    - The server stores chat histories in markdown files, which the user can also download from the UI (useful for review or sharing).
+
 
 # Repository Structure
-
-TODO
+quack-norris  (__init__.py skipped for readability)
+├─── .github/
+│   └─── workflows/             # Test pipelines
+├─── quack_norris/              # Main source folder
+│   ├─── __main__.py            # Entry point for the app, starts server or ui
+│   ├─── common/                # Code common between server and ui
+│   │   ├─── _types.py          # Shared type definitions
+│   │   ├─── config.py          # Loading and writing config files
+│   │   └─── llm_provider.py    # Shared type definitions
+│   ├─── configs/               # Default configs
+│   │   ├─── server.json        # Default server config
+│   │   └─── ui.json            # Default configuration settings for UI (e.g., themes, preferences)
+│   ├─── server/                # All components related to the server
+│   │   ├─── api_server.py      # Flask server providing the OpenAI Style Rest API
+│   │   ├─── router.py          # Decides what to do with incoming requests.
+│   │   ├─── user.py            # Stores the user state (selected chat/conversation and also workdir + data_sources for agents/tools)
+│   │   └─── tools              # A folder containing all the tools that the AI (router) can call.
+│   └── ui/                     # Main UI components
+│       ├── app.py              # UI entry point, creates the floating duck
+│       ├── assets/             # UI assets and resources
+│       │   ├── icons/          # Icon images for the launcher and components
+│       │   └── stylesheets/    # CSS files for styling
+│       ├── models/             # State management and data models
+│       │   ├── message.py      # Data model for messages
+│       │   └── chat_state.py   # Chat state (messages of current conversation, etc.)
+│       └── views/              # Main UI windows and layouts
+│           ├── launcher.py     # Floating duck
+│           ├── chat_view.py    # Chat window layout and controls
+|           └── components/     # Reusable UI components (e.g. buttons, etc.)
+└───tests/                      # Unit tests
+    └───data/                   # Data for unit tests
 
 
 # Dependencies
@@ -48,6 +120,9 @@ dependencies = [
     "pyside6>=6.8.0.1",
 ]
 
+
 ## Additional Considerations
 
-1. TODO
+1. The code has a clear structure, which makes it easy to understand and navigate.
+2. The code is extensible and maintainable, so that it can be easily extended in the future.
+3. The code is testable, so its stability can be ensured.
