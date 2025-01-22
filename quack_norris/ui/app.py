@@ -1,6 +1,5 @@
 import os
 import sys
-from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QPoint
@@ -16,8 +15,13 @@ def main(config: dict[str, Any]):
     app.setApplicationName("quack-norris-ui")
     app.setApplicationDisplayName("Quack Norris")
 
+    duck_path = os.path.join(os.path.dirname(__file__), "assets", "icons", "duck_low_res.png")
+    config_duck_path = config.get("launcher_icon", duck_path)
+    if os.path.exists(config_duck_path):
+        duck_path = config_duck_path
+
     # Initialize global state
-    launcher = LauncherWindow(config)
+    launcher = LauncherWindow(config, duck_path)
     launcher.show()
     chat_window = ChatWindow(config)
     chat_window.hide()
@@ -38,15 +42,13 @@ def main(config: dict[str, Any]):
         else:
             launcher.show()
 
-    setup_system_tray(app, on_hide, config)
+    setup_system_tray(app, on_hide, duck_path)
     sys.exit(app.exec())
 
 
-def setup_system_tray(app: QApplication, on_hide: Callable, config: dict[str, Any]):
+def setup_system_tray(app: QApplication, on_hide: Callable, duck_path: str):
     # Set application icon for system tray (use one of your existing icons)
-    duck_path = os.path.join(os.path.dirname(__file__), "assets", "icons", "duck_low_res.png")
-    icon_path = str(Path(duck_path))
-    icon = QIcon(icon_path)
+    icon = QIcon(duck_path)
 
     # Create system tray
     tray_icon = QSystemTrayIcon(icon, app)

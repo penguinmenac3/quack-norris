@@ -1,7 +1,6 @@
-import os
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QPixmap, QTransform
 from PySide6.QtWidgets import QLabel, QWidget
 
@@ -13,7 +12,7 @@ class LauncherWindow(QWidget):
     )  # x, y, w, h, screen_x, screen_y, screen_w, screen_h
     sig_exit = Signal()
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any], duck_path: str):
         super().__init__()
         self.config = config
 
@@ -24,10 +23,7 @@ class LauncherWindow(QWidget):
 
         # Create duck icon
         self.duck_label = QLabel(self)
-        duck_path = os.path.join(
-            os.path.dirname(__file__), "..", "assets", "icons", "duck_low_res.png"
-        )
-        pixmap = QPixmap(duck_path)
+        pixmap = QPixmap(duck_path).scaled(QSize(*self.config.get("launcher_size", [84, 84])))
         self.duck_label.setPixmap(pixmap)
         self.resize(pixmap.size())
         screen = self.screen()
@@ -46,7 +42,7 @@ class LauncherWindow(QWidget):
         if (
             event.button() == Qt.LeftButton
             and event.modifiers() & Qt.ControlModifier
-            and self.config.get("ctrl_click_to_exit", False)
+            and self.config.get("launcher_ctrl_click_to_exit", False)
         ):
             self.sig_exit.emit()
         elif event.button() == Qt.LeftButton:

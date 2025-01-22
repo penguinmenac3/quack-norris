@@ -33,6 +33,29 @@ quack-norris-ui
 
 If you want to add quack norris to the autostart or the startmenu on windows, simply find the `quack-norris-ui.exe`, wherever your python installation put it and add a **link** to it to your startmenu (in the right click settings, you can even configure an icon). You can find the startmenu here: `C:\Users\YOUR_USERNAME\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`.
 
+### 🎨 Config
+
+Config files can be created in the current working directory or in your users config folder `~/.config/quack_norris/`.
+
+In your `server.json` and in your `ui.json` you can configure the server host and port.
+```json
+{
+  "host": "127.0.0.1",
+  "port": 11337
+}
+```
+
+Additionally, in your `ui.json` you can configure the launcher look and feel.
+```json
+{
+  ...
+  "launcher_ctrl_click_to_exit": false,
+  "launcher_size": [84, 84],
+  "launcher_icon": "my_icon.png"
+}
+```
+
+
 ### 🌐 API
 
 The server exposes an OpenAI style API for you to use in other tools as well.

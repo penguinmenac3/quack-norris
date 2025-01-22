@@ -1,5 +1,4 @@
 {
     "host": "127.0.0.1",
-    "port": 11337,
-    "ctrl_click_to_exit": false
+    "port": 11337
 }
