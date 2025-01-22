@@ -1,7 +1,7 @@
 import os
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QTransform
 from PySide6.QtWidgets import QLabel, QWidget
 
 
@@ -29,7 +29,9 @@ class LauncherWindow(QWidget):
         screen_rect = screen.geometry()
         py = max(screen_rect.height() - 100 - pixmap.height(), 0)
         px = max(screen_rect.width() - 50 - pixmap.width(), 0)
+        old_x = self.x()
         self.move(px, py)
+        self._mirror_duck_if_needed(old_x)
 
         # Setup mouse movement variables
         self._is_dragging = False
@@ -67,8 +69,24 @@ class LauncherWindow(QWidget):
         if self._is_dragging:
             new_x = event.globalPosition().x() - self._drag_offset[0]
             new_y = event.globalPosition().y() - self._drag_offset[1]
+            old_x = self.x()
             self.move(new_x, new_y)
+            self.resize(self.duck_label.pixmap().size())
+            self._mirror_duck_if_needed(old_x)
             # Set was_dragged to True since the mouse was moved
             self._was_dragged = True
             self.sig_position.emit(self.x(), self.y(), self.width(), self.height())
         super().mouseMoveEvent(event)
+
+    def _mirror_duck_if_needed(self, old_x):
+        screen_w = self.screen().geometry().width()
+        w = self.width()
+        new_x = self.x()
+        if (new_x + w / 2 > screen_w / 2 and old_x + w / 2 <= screen_w / 2) or (
+            new_x + w / 2 <= screen_w / 2 and old_x + w / 2 > screen_w / 2
+        ):
+            flip_scale = -1.0
+        else:
+            flip_scale = 1.0
+        transform = QTransform(flip_scale, 0, 0, 1, 0, 0)
+        self.duck_label.setPixmap(self.duck_label.pixmap().transformed(transform))
