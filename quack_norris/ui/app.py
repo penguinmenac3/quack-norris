@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QPoint
@@ -64,9 +65,6 @@ def setup_system_tray(app: QApplication, on_hide: callable, config: any):
     # Set up the system tray
     tray_icon.setContextMenu(tray_menu)
     tray_icon.show()
-
-    tray_menu.exec_(QPoint(0, 0))
-    tray_menu.close()
 
     def tray_icon_activated(reason):
         if reason == QSystemTrayIcon.ActivationReason.Context:
