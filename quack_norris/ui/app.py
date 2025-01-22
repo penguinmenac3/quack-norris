@@ -25,7 +25,7 @@ def main(config: any):
     launcher.sig_toggle_chat.connect(
         lambda: chat_window.show() if not chat_window.isVisible() else chat_window.hide()
     )
-    launcher.sig_position.connect(lambda x, y, w, h: chat_window.align_with_launcher(x, y, w, h))
+    launcher.sig_position.connect(lambda *args: chat_window.align_with_launcher(*args))
     launcher.sig_exit.connect(lambda: sys.exit(0))
 
     # Run the app

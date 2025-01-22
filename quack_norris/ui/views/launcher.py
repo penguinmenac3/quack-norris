@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QLabel, QWidget
 
 class LauncherWindow(QWidget):
     sig_toggle_chat = Signal()
-    sig_position = Signal(int, int, int, int)  # x, y, w, h
+    sig_position = Signal(int, int, int, int, int, int, int, int)  # x, y, w, h, screen_x, screen_y, screen_w, screen_h
     sig_exit = Signal()
 
     def __init__(self, config=None):
@@ -62,26 +62,33 @@ class LauncherWindow(QWidget):
         else:
             self._is_dragging = False
             self._drag_offset = None
-        self.sig_position.emit(self.x(), self.y(), self.width(), self.height())
+        screen = self.screen().geometry()
+        self.sig_position.emit(
+            self.x(), self.y(), self.width(), self.height(), screen.x(), screen.y(), screen.width(), screen.height()
+        )
         super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._is_dragging:
             new_x = event.globalPosition().x() - self._drag_offset[0]
             new_y = event.globalPosition().y() - self._drag_offset[1]
-            old_x = self.x()
+            old_x = self.x() - self.screen().geometry().x()
             self.move(new_x, new_y)
             self.resize(self.duck_label.pixmap().size())
             self._mirror_duck_if_needed(old_x)
             # Set was_dragged to True since the mouse was moved
             self._was_dragged = True
-            self.sig_position.emit(self.x(), self.y(), self.width(), self.height())
+            screen = self.screen().geometry()
+            self.sig_position.emit(
+                self.x(), self.y(), self.width(), self.height(), screen.x(), screen.y(), screen.width(), screen.height()
+            )
         super().mouseMoveEvent(event)
 
     def _mirror_duck_if_needed(self, old_x):
-        screen_w = self.screen().geometry().width()
+        screen = self.screen().geometry()
+        screen_w = screen.width()
         w = self.width()
-        new_x = self.x()
+        new_x = self.x() - screen.x()
         if (new_x + w / 2 > screen_w / 2 and old_x + w / 2 <= screen_w / 2) or (
             new_x + w / 2 <= screen_w / 2 and old_x + w / 2 > screen_w / 2
         ):

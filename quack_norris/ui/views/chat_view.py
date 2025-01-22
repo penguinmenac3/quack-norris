@@ -95,27 +95,27 @@ class ChatWindow(QMainWindow):
     def show_message(self, message: str):
         self.messages_area.append(message)
 
-    def align_with_launcher(self, x, y, w, h):
-        screen = self.screen()
-        screen_rect = screen.geometry()
-        win_h = min(screen_rect.height() / 2 + h / 2, 800)
-        win_w = min(screen_rect.width() / 2 - w / 2, 600)
+    def align_with_launcher(self, x, y, w, h, screen_x, screen_y, screen_w, screen_h):
+        win_h = min(screen_h / 2 + h / 2, 800)
+        win_w = min(screen_w / 2 - w / 2, 600)
         p = [0, 0]
+        x = x - screen_x
+        y = y - screen_y
 
         # Calculate window position based on Launcher's position
-        if x + w / 2 <= screen_rect.width() / 2 and y + h / 2 <= screen_rect.height() / 2:
+        if x + w / 2 <= screen_w / 2 and y + h / 2 <= screen_h / 2:
             # Top-left quadrant
             p = (x + w, y)
-        elif x + w / 2 > screen_rect.width() / 2 and y + h / 2 <= screen_rect.height() / 2:
+        elif x + w / 2 > screen_w / 2 and y + h / 2 <= screen_h / 2:
             # Top-right quadrant
             p = (x - win_w, y)
-        elif x + w / 2 <= screen_rect.width() / 2 and y + h / 2 > screen_rect.height() / 2:
+        elif x + w / 2 <= screen_w / 2 and y + h / 2 > screen_h / 2:
             # Bottom-left quadrant
             p = (x + w, y + h - win_h)
         else:
             # Bottom-right quadrant
             p = (x - win_w, y + h - win_h)
-        self.setGeometry(p[0], p[1], win_w, win_h)
+        self.setGeometry(p[0] + screen_x, p[1] + screen_y, win_w, win_h)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
