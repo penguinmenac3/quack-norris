@@ -1,0 +1,23 @@
+{
+    "files.autoSave": "afterDelay",
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true
+    },
+    "flake8.args": [
+        "--max-line-length=100",
+        "--max-complexity=10"
+    ],
+    "editor.rulers": [
+        88,
+        {
+            "column": 100,
+            "color": "gray",
+        }
+    ],
+    "black-formatter.args": [
+        "--line-length=100"
+    ],
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modifications",
+}
