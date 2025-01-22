@@ -20,4 +20,5 @@
     ],
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "modifications",
+    "python.analysis.typeCheckingMode": "standard",
 }
