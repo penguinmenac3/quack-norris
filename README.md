@@ -31,6 +31,7 @@ quack-norris-server
 quack-norris-ui
 ```
 
+If you want to add quack norris to the autostart or the startmenu on windows, simply find the `quack-norris-ui.exe`, wherever your python installation put it and add a **link** to it to your startmenu (in the right click settings, you can even configure an icon). You can find the startmenu here: `C:\Users\YOUR_USERNAME\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`.
 
 ### 🌐 API
 
