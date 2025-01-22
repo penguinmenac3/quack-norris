@@ -1,4 +1,5 @@
 from typing import Any
+import urllib.parse
 
 from PySide6.QtCore import Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -19,13 +20,18 @@ class ChatWindow(QMainWindow):
         self.setCentralWidget(self.web_view)
 
         # Set url for the PWA quack-norris
+        host = config.get("host", "")
+        port = config.get("port", "")
+        token = config.get("token", "")
+        query = ""
+        if host != "" or port != "" or token != "":
+            query = "#" + urllib.parse.urlencode(dict(host=host, port=port, token=token))
         if config["debug"]:
             # If debugging, use local url, so we can show the vite server content
-            self.web_view.setUrl(
-                "http://localhost:5173/quack-norris/"
-            )  # PLACEHOLDER until we have webpage
+            self.web_view.setUrl("http://localhost:5173/quack-norris/{query}".format(query=query))
         else:
-            self.web_view.setUrl(config.get("chat_url", "http://localhost:3000/"))  # PLACEHOLDER
+            default_url = "https://penguinmenac3.github.io/quack-norris/{query}"  # PLACEHOLDER
+            self.web_view.setUrl(config.get("chat_url", default_url).format(query=query))
 
     def align_with_launcher(self, x, y, w, h, screen_x, screen_y, screen_w, screen_h):
         win_h = min(screen_h / 2 + h / 2, 800)
