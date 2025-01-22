@@ -45,10 +45,11 @@ In your `server.json` and in your `ui.json` you can configure the server host an
 }
 ```
 
-Additionally, in your `ui.json` you can configure the launcher look and feel.
+Additionally, in your `ui.json` you can configure the chat application (if you want a custom one) launcher look and feel.
 ```json
 {
   ...
+  "chat_url": "https://chatgpt.com/",
   "launcher_ctrl_click_to_exit": false,
   "launcher_size": [84, 84],
   "launcher_icon": "my_icon.png"

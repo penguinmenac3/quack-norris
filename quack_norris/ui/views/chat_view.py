@@ -25,7 +25,7 @@ class ChatWindow(QMainWindow):
                 "http://localhost:5173/quack-norris/"
             )  # PLACEHOLDER until we have webpage
         else:
-            self.web_view.setUrl("https://github.com")  # PLACEHOLDER until we have webpage
+            self.web_view.setUrl(config.get("chat_url", "http://localhost:3000/"))  # PLACEHOLDER
 
     def align_with_launcher(self, x, y, w, h, screen_x, screen_y, screen_w, screen_h):
         win_h = min(screen_h / 2 + h / 2, 800)
