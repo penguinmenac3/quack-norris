@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import QMainWindow
 
 
 class ChatWindow(QMainWindow):
@@ -18,7 +18,9 @@ class ChatWindow(QMainWindow):
         # Set url for the PWA quack-norris
         if config["debug"]:
             # If debugging, use local url, so we can show the vite server content
-            self.web_view.setUrl("http://localhost:5173/quack-norris/")  # PLACEHOLDER until we have webpage
+            self.web_view.setUrl(
+                "http://localhost:5173/quack-norris/"
+            )  # PLACEHOLDER until we have webpage
         else:
             self.web_view.setUrl("https://github.com")  # PLACEHOLDER until we have webpage
 

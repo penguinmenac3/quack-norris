@@ -1,6 +1,6 @@
-from quack_norris.common._types import EmbedResponse, TextResponse, Message
-from quack_norris.server.user import User
+from quack_norris.common._types import EmbedResponse, Message, TextResponse
 from quack_norris.common.llm_provider import OllamaProvider
+from quack_norris.server.user import User
 
 
 class Router(object):

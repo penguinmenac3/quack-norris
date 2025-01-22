@@ -1,13 +1,13 @@
-from uuid import uuid4
-from time import time
 from functools import wraps
+from time import time
+from uuid import uuid4
+
 from flask import Flask, request
 from waitress import serve
 
 from quack_norris.common._types import Message
-from quack_norris.server.user import get_users, User
 from quack_norris.server.router import router
-
+from quack_norris.server.user import User, get_users
 
 app = Flask(__name__)
 

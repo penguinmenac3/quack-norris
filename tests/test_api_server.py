@@ -1,10 +1,10 @@
-import unittest
-import subprocess
-import signal
 import os
+import signal
+import subprocess
 import time
+import unittest
 
-from quack_norris.common.llm_provider import OpenAIProvider, Message
+from quack_norris.common.llm_provider import Message, OpenAIProvider
 
 os.chdir(os.path.dirname(__file__))
 

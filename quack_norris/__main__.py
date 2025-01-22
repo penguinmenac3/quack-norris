@@ -1,6 +1,7 @@
 import sys
-from setproctitle import setproctitle
 from argparse import ArgumentParser
+
+from setproctitle import setproctitle
 
 from quack_norris.common.config import read_config
 

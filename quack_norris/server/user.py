@@ -3,7 +3,6 @@ from typing import NamedTuple
 
 from quack_norris.common.config import read_config, write_config
 
-
 USER_CONFIG_NAME = "users.json"
 _users = None
 
@@ -21,7 +20,9 @@ def get_users() -> dict[str, User]:
         try:
             data = read_config(USER_CONFIG_NAME)
             _users = {
-                date["api_key"]: User(date["api_key"], date["selected_chat"], date["workdir"], date["data_sources"])
+                date["api_key"]: User(
+                    date["api_key"], date["selected_chat"], date["workdir"], date["data_sources"]
+                )
                 for date in data
             }
         except json.JSONDecodeError:

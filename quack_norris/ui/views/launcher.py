@@ -7,7 +7,9 @@ from PySide6.QtWidgets import QLabel, QWidget
 
 class LauncherWindow(QWidget):
     sig_toggle_chat = Signal()
-    sig_position = Signal(int, int, int, int, int, int, int, int)  # x, y, w, h, screen_x, screen_y, screen_w, screen_h
+    sig_position = Signal(
+        int, int, int, int, int, int, int, int
+    )  # x, y, w, h, screen_x, screen_y, screen_w, screen_h
     sig_exit = Signal()
 
     def __init__(self, config=None):
@@ -21,7 +23,9 @@ class LauncherWindow(QWidget):
 
         # Create duck icon
         self.duck_label = QLabel(self)
-        duck_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icons", "duck_low_res.png")
+        duck_path = os.path.join(
+            os.path.dirname(__file__), "..", "assets", "icons", "duck_low_res.png"
+        )
         pixmap = QPixmap(duck_path)
         self.duck_label.setPixmap(pixmap)
         self.resize(pixmap.size())
@@ -64,7 +68,14 @@ class LauncherWindow(QWidget):
             self._drag_offset = None
         screen = self.screen().geometry()
         self.sig_position.emit(
-            self.x(), self.y(), self.width(), self.height(), screen.x(), screen.y(), screen.width(), screen.height()
+            self.x(),
+            self.y(),
+            self.width(),
+            self.height(),
+            screen.x(),
+            screen.y(),
+            screen.width(),
+            screen.height(),
         )
         super().mouseReleaseEvent(event)
 
@@ -80,7 +91,14 @@ class LauncherWindow(QWidget):
             self._was_dragged = True
             screen = self.screen().geometry()
             self.sig_position.emit(
-                self.x(), self.y(), self.width(), self.height(), screen.x(), screen.y(), screen.width(), screen.height()
+                self.x(),
+                self.y(),
+                self.width(),
+                self.height(),
+                screen.x(),
+                screen.y(),
+                screen.width(),
+                screen.height(),
             )
         super().mouseMoveEvent(event)
 
