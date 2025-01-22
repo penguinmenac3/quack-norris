@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Any, Callable
 
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QAction, QCursor, QIcon
@@ -10,7 +11,7 @@ from quack_norris.ui.views.chat_view import ChatWindow
 from quack_norris.ui.views.launcher import LauncherWindow
 
 
-def main(config: any):
+def main(config: dict[str, Any]):
     app = QApplication()
     app.setApplicationName("quack-norris-ui")
     app.setApplicationDisplayName("Quack Norris")
@@ -41,7 +42,7 @@ def main(config: any):
     sys.exit(app.exec())
 
 
-def setup_system_tray(app: QApplication, on_hide: callable, config: any):
+def setup_system_tray(app: QApplication, on_hide: Callable, config: dict[str, Any]):
     # Set application icon for system tray (use one of your existing icons)
     duck_path = os.path.join(os.path.dirname(__file__), "assets", "icons", "duck_low_res.png")
     icon_path = str(Path(duck_path))

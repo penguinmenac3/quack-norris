@@ -9,7 +9,7 @@ class Message(NamedTuple):
 class EmbedResponse(NamedTuple):
     prompt_tokens: int
     total_tokens: int
-    embeds: list[str]
+    embeds: list[float]
 
 
 class TextResponse(NamedTuple):

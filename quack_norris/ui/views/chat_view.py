@@ -1,10 +1,13 @@
+from typing import Any
+
 from PySide6.QtCore import Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QMainWindow
 
 
 class ChatWindow(QMainWindow):
-    def __init__(self, config: any):
+
+    def __init__(self, config: dict[str, Any]):
         super().__init__()
         self.config = config
 

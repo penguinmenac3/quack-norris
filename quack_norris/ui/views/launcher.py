@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QTransform
@@ -12,7 +13,7 @@ class LauncherWindow(QWidget):
     )  # x, y, w, h, screen_x, screen_y, screen_w, screen_h
     sig_exit = Signal()
 
-    def __init__(self, config=None):
+    def __init__(self, config: dict[str, Any]):
         super().__init__()
         self.config = config
 
@@ -38,7 +39,6 @@ class LauncherWindow(QWidget):
         self._mirror_duck_if_needed(old_x)
 
         # Setup mouse movement variables
-        self._is_dragging = False
         self._was_dragged = False
         self._drag_offset = None
 
@@ -50,7 +50,6 @@ class LauncherWindow(QWidget):
         ):
             self.sig_exit.emit()
         elif event.button() == Qt.LeftButton:
-            self._is_dragging = True
             self._drag_offset = (
                 event.globalPosition().x() - self.x(),
                 event.globalPosition().y() - self.y(),
@@ -64,7 +63,6 @@ class LauncherWindow(QWidget):
             # If it wasn't being dragged, emit the signal
             self.sig_toggle_chat.emit()
         else:
-            self._is_dragging = False
             self._drag_offset = None
         screen = self.screen().geometry()
         self.sig_position.emit(
@@ -80,9 +78,9 @@ class LauncherWindow(QWidget):
         super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self._is_dragging:
-            new_x = event.globalPosition().x() - self._drag_offset[0]
-            new_y = event.globalPosition().y() - self._drag_offset[1]
+        if self._drag_offset is not None:
+            new_x = int(event.globalPosition().x() - self._drag_offset[0])
+            new_y = int(event.globalPosition().y() - self._drag_offset[1])
             old_x = self.x() - self.screen().geometry().x()
             self.move(new_x, new_y)
             self.resize(self.duck_label.pixmap().size())

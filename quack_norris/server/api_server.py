@@ -31,6 +31,8 @@ def require_auth(func):
 @require_auth
 def embeddings(user: User):
     data = request.json
+    if data is None or "model" not in data or "input" not in data:
+        return "Invalid request data.", 400
     model = data["model"]
     inputs = data["input"]
     if isinstance(inputs, str):
@@ -56,6 +58,8 @@ def embeddings(user: User):
 @require_auth
 def completions(user: User):
     data = request.json
+    if data is None or "model" not in data or "prompt" not in data:
+        return "Invalid request data.", 400
     model = data["model"]
     prompt = data["prompt"]
     suffix = data.get("suffix", "")
@@ -89,6 +93,8 @@ def completions(user: User):
 @require_auth
 def chat_completions(user: User):
     data = request.json
+    if data is None or "model" not in data or "messages" not in data:
+        return "Invalid request data.", 400
     model = data["model"]
     messages = [
         Message(role=message["role"], content=message["content"])

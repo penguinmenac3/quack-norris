@@ -1,8 +1,9 @@
+from typing import Any
 import json
 import os
 
 
-def read_config(config_name: str) -> any:
+def read_config(config_name: str) -> Any:
     home_config_path = os.path.expanduser("~/.config/quack_norris/").replace("/", os.sep)
     user_home_config_path = os.path.join(home_config_path, config_name)
     code_home_config_path = os.path.join(os.path.dirname(__file__), "..", "configs", config_name)
@@ -28,7 +29,7 @@ def read_config(config_name: str) -> any:
     return data
 
 
-def write_config(config_name: str, content: str):
+def write_config(config_name: str, content: Any) -> None:
     home_config_path = os.path.expanduser("~/.config/quack_norris/")
     user_home_config_path = os.path.join(home_config_path, config_name)
     path = config_name
