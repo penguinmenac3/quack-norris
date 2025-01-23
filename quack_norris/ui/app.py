@@ -42,11 +42,14 @@ def main(config: dict[str, Any]):
         else:
             launcher.show()
 
-    setup_system_tray(app, on_hide, duck_path)
+    def on_reset():
+        launcher.reset_position()
+
+    setup_system_tray(app, on_hide, on_reset, duck_path)
     sys.exit(app.exec())
 
 
-def setup_system_tray(app: QApplication, on_hide: Callable, duck_path: str):
+def setup_system_tray(app: QApplication, on_hide: Callable, on_reset: Callable, duck_path: str):
     # Set application icon for system tray (use one of your existing icons)
     icon = QIcon(duck_path)
 
@@ -59,6 +62,9 @@ def setup_system_tray(app: QApplication, on_hide: Callable, duck_path: str):
     hide_action = QAction("Show/Hide", app)
     hide_action.triggered.connect(on_hide)
     tray_menu.addAction(hide_action)
+    reset_action = QAction("Reset Pos.", app)
+    reset_action.triggered.connect(on_reset)
+    tray_menu.addAction(reset_action)
 
     exit_action = QAction("Exit", app)
     exit_action.triggered.connect(lambda: sys.exit(0))

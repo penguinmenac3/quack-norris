@@ -26,17 +26,20 @@ class LauncherWindow(QWidget):
         pixmap = QPixmap(duck_path).scaled(QSize(*self.config.get("launcher_size", [84, 84])))
         self.duck_label.setPixmap(pixmap)
         self.resize(pixmap.size())
-        screen = self.screen()
-        screen_rect = screen.geometry()
-        py = max(screen_rect.height() - 100 - pixmap.height(), 0)
-        px = max(screen_rect.width() - 50 - pixmap.width(), 0)
-        old_x = self.x()
-        self.move(px, py)
-        self._mirror_duck_if_needed(old_x)
+        self.reset_position()
 
         # Setup mouse movement variables
         self._was_dragged = False
         self._drag_offset = None
+
+    def reset_position(self):
+        screen = self.screen()
+        screen_rect = screen.geometry()
+        py = max(screen_rect.height() - 100 - self.height(), 0)
+        px = max(screen_rect.width() - 50 - self.width(), 0)
+        old_x = self.x() - self.screen().geometry().x()
+        self.move(px + screen_rect.x(), py + screen_rect.y())
+        self._mirror_duck_if_needed(old_x)
 
     def mousePressEvent(self, event):
         if (
