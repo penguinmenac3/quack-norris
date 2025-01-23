@@ -38,15 +38,29 @@ def stop_test_server():
         print("Test server is not running or already terminated.")
 
 
+def _manual_test_run():
+    flag_file = os.path.join(os.path.dirname(__file__), "_enable_manual")
+    if os.path.exists(flag_file):
+        return True
+    print(f"Skipping Test in {__file__}. If you want to run it, create '{flag_file}'.")
+    return False
+
+
 class TestAPIServer(unittest.TestCase):
     def setUp(self):
+        if not _manual_test_run():
+            return
         start_test_server()
         self.client = OpenAIProvider(base_url="http://localhost:11337/v1", api_key="test_key")
 
     def tearDown(self):
+        if not _manual_test_run():
+            return
         stop_test_server()
 
     def test_chat(self):
+        if not _manual_test_run():
+            return
         messages = [
             Message("system", "You are a helpful assistant."),
             Message("user", "Who won the world series in 2020?"),
