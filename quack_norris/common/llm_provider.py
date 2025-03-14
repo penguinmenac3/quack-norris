@@ -1,97 +1,60 @@
-import os
-
-import tiktoken
+from typing import Generator, List
+import openai
 from openai import OpenAI as _OpenAIAPI
-from openai.types import CompletionUsage
 
-from quack_norris.common._types import EmbedResponse, Message, TextResponse
+from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest
 
 
-class LlmProvider(object):
+class LLM(object):
 
-    def get_token_count(
-        self,
-        model: str,
-        prompt_or_messages: str | list[Message],
-        usage: CompletionUsage | None,
-        result: str,
-    ):
-        if usage is None:
-            if "gpt" in model.lower():
-                encoding = tiktoken.get_encoding("gpt2")
-            else:
-                encoding = tiktoken.get_encoding("cl100k")
-            if isinstance(prompt_or_messages, str):
-                prompt_tokens = len(encoding.encode(prompt_or_messages))
-                total_tokens = prompt_tokens + len(encoding.encode(result))
-            else:
-                # For chat messages, compute the number of tokens
-                prompt_tokens = 0
-                for message in prompt_or_messages:
-                    prompt_tokens += 3  # Tokens per message
-                    prompt_tokens += len(encoding.encode(message.role))
-                    prompt_tokens += len(encoding.encode(message.content))
-                prompt_tokens += 3
-                total_tokens = prompt_tokens + len(encoding.encode(result))
-        else:
-            prompt_tokens = usage.prompt_tokens
-            total_tokens = usage.total_tokens
-        return prompt_tokens, total_tokens
-
-    def chat(self, model: str, messages: list[Message]) -> TextResponse:
+    def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
         raise NotImplementedError("Must be implemented by subclass!")
 
-    def complete(self, model: str, prompt: str) -> TextResponse:
-        raise NotImplementedError("Must be implemented by subclass!")
-
-    def embeddings(self, model: str, inputs: list[str]) -> EmbedResponse:
+    def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
         raise NotImplementedError("Must be implemented by subclass!")
 
 
-class OpenAIProvider(LlmProvider):
-    def __init__(self, base_url, api_key):
+class OpenAI(LLM):
+    def __init__(self, base_url="http://localhost:11434/v1", api_key="ollama"):
         self._client = _OpenAIAPI(base_url=base_url, api_key=api_key)
 
-    def chat(self, model: str, messages: list[Message]) -> TextResponse:
-        response = self._client.chat.completions.create(
-            model=model,
-            messages=[message._asdict() for message in messages],  # type: ignore
-        )
-        result = response.choices[0].message.content or ""
-        prompt_tokens, total_tokens = self.get_token_count(model, messages, response.usage, result)
-        return TextResponse(
-            prompt_tokens=prompt_tokens,
-            total_tokens=total_tokens,
-            finish_reason=response.choices[0].finish_reason,
-            result=result,
-        )
+    def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
+        response = self._client.embeddings.create(**request.model_dump())
+        return [d.embedding for d in response.data]
 
-    def complete(self, model: str, prompt: str) -> TextResponse:
-        response = self._client.completions.create(
-            model=model,
-            prompt=prompt
-        )
-        result = response.choices[0].text or ""
-        prompt_tokens, total_tokens = self.get_token_count(model, prompt, response.usage, result)
-        return TextResponse(
-            prompt_tokens=prompt_tokens,
-            total_tokens=total_tokens,
-            finish_reason=response.choices[0].finish_reason,
-            result=result,
-        )
+    def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
+        try:
+            response = self._client.chat.completions.create(**request.model_dump())
+        except openai.NotFoundError as e:
+            raise RuntimeError(str(e))
+        if request.stream:
+            return OpenAI._stream_wrapper(response)
+        else:
+            if response.choices[0].finish_reason == "error":
+                raise RuntimeError(response.choices[0].message.content)
+            return response.choices[0].message.content or ""
 
-    def embeddings(self, model: str, inputs: list[str]) -> EmbedResponse:
-        response = self._client.embeddings.create(
-            model=model,
-            input=inputs
-        )
-        return EmbedResponse(
-            prompt_tokens=response.usage.prompt_tokens,
-            total_tokens=response.usage.total_tokens,
-            embeds=response.data[0].embedding
-        )
+    @staticmethod
+    def _stream_wrapper(stream):
+        for chunk in stream:
+            yield chunk.choices[0].delta.content or ""
 
 
-class OllamaProvider(OpenAIProvider):
-    def __init__(self, base_url='http://localhost:11434'):
-        super().__init__(base_url=os.path.join(base_url, "v1").replace("\\", "/"), api_key='ollama')
+class QuackNorris(LLM):
+    def __init__(self, llm: LLM | None = None, default_model: str = "gemma3:12b"):
+        self._llm = llm or OpenAI()
+        self._default_model = default_model
+
+    def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
+        if request.model != "quack-norris":
+            return self._llm.embeddings(request)
+        else:
+            request.model = "nomic-embed-text"
+            return self._llm.embeddings(request)
+
+    def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
+        if request.model != "quack-norris":
+            return self._llm.chat(request)
+        else:
+            request.model = self._default_model
+            return self._llm.chat(request)
