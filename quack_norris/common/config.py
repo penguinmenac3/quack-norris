@@ -15,7 +15,6 @@ def read_config(config_name: str) -> Any:
     elif os.path.exists(code_home_config_path):
         path = code_home_config_path
     else:
-        print(f"FAILED to find config: {config_name}")
         raise FileNotFoundError(
             "Config not found anywhere:\n"
             + f"  {config_name}\n  {user_home_config_path}\n  {code_home_config_path}"
