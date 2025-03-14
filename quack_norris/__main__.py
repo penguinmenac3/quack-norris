@@ -35,7 +35,8 @@ def ui():
 
 
 def server():
-    from quack_norris.server.api_server import main as _api_server
+    import uvicorn
+
     setproctitle("quack-norris-server")
     parser = ArgumentParser("quack-norris-server")
     config = read_config("server.json")
@@ -55,7 +56,7 @@ def server():
     )
     parser.add_argument("--debug", action="store_true", help="Run the flask server in debug mode.")
     args = parser.parse_args()
-    _api_server(host=args.host, port=args.port, debug=args.debug)
+    uvicorn.run("quack_norris.server.api_server:app", host=args.host, port=args.port, reload=True)
 
 
 def main():
