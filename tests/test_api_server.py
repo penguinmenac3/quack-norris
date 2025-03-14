@@ -1,10 +1,12 @@
 import os
+import sys
 import signal
 import subprocess
 import time
 import unittest
 
-from quack_norris.common.llm_provider import Message, OpenAIProvider
+from quack_norris.common.llm_provider import OpenAI
+from quack_norris.common._types import ChatMessage, ChatCompletionRequest
 
 os.chdir(os.path.dirname(__file__))
 
@@ -25,6 +27,8 @@ def start_test_server():
 
 def stop_test_server():
     global test_server_process
+    if os.name == "nt":
+        return
     if test_server_process and test_server_process.poll() is None:
         try:
             # Send a SIGTERM signal to the process
@@ -51,7 +55,7 @@ class TestAPIServer(unittest.TestCase):
         if not _manual_test_run():
             return
         start_test_server()
-        self.client = OpenAIProvider(base_url="http://localhost:11337/v1", api_key="test_key")
+        self.client = OpenAI(base_url="http://localhost:11337", api_key="test_key")
 
     def tearDown(self):
         if not _manual_test_run():
@@ -62,10 +66,49 @@ class TestAPIServer(unittest.TestCase):
         if not _manual_test_run():
             return
         messages = [
-            Message("system", "You are a helpful assistant."),
-            Message("user", "Who won the world series in 2020?"),
-            Message("assistant", "The LA Dodgers won in 2020."),
-            Message("user", "Where was it played?"),
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Who won the world series in 2020?"),
+            ChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
+            ChatMessage(role="user", content="Where was it played?"),
         ]
-        response = self.client.chat(model="qwen2.5-coder:1.5b-base", messages=messages)
+        response = self.client.chat(
+            ChatCompletionRequest(model="qwen2.5-coder:1.5b", messages=messages)
+        )
+        print(response)
+
+    def test_chat_stream(self):
+        if not _manual_test_run():
+            return
+        messages = [
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Who won the world series in 2020?"),
+            ChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
+            ChatMessage(role="user", content="Where was it played?"),
+        ]
+        response = self.client.chat(
+            ChatCompletionRequest(model="qwen2.5-coder:1.5b", messages=messages, stream=True)
+        )
+        for chunk in response:
+            print(chunk, end="")
+            sys.stdout.flush()
+        print()
+
+    def test_chat_invalid_model(self):
+        if not _manual_test_run():
+            return
+        messages = [
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Who won the world series in 2020?"),
+            ChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
+            ChatMessage(role="user", content="Where was it played?"),
+        ]
+        fail = False
+        try:
+            response = self.client.chat(
+                ChatCompletionRequest(model="non-existent", messages=messages)
+            )
+        except RuntimeError as e:
+            fail = True
+            response = str(e)
+        assert fail, response
         print(response)
