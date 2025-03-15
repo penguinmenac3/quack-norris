@@ -13,8 +13,8 @@
     "vite": "^6.0.5"
   },
   "dependencies": {
-    "marked": "^15.0.4",
     "@types/uuid": "^9.0.0",
+    "marked": "^15.0.7",
     "uuid": "^9.0.0"
   }
 }

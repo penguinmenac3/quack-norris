@@ -1,0 +1,7 @@
+.chat {
+    display: flex;
+    flex-direction: column;
+    /* Change this line */
+    width: 100%;
+    height: 100%;
+}
