@@ -28,9 +28,13 @@ class ChatWindow(QMainWindow):
             query = "#" + urllib.parse.urlencode(dict(host=host, port=port, token=token))
         if config["debug"]:
             # If debugging, use local url, so we can show the vite server content
-            self.web_view.setUrl("http://localhost:5173/quack-norris/{query}".format(query=query))
+            self.web_view.setUrl(
+                "http://localhost:5173/quack-norris/#chat&{query}".format(query=query)
+            )
         else:
-            default_url = "https://penguinmenac3.github.io/quack-norris/{query}"  # PLACEHOLDER
+            default_url = (
+                "https://penguinmenac3.github.io/quack-norris/#chat&{query}"  # PLACEHOLDER
+            )
             self.web_view.setUrl(config.get("chat_url", default_url).format(query=query))
 
     def align_with_launcher(self, x, y, w, h, screen_x, screen_y, screen_w, screen_h):
