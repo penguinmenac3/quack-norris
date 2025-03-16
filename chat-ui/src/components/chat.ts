@@ -14,4 +14,9 @@ export class Chat extends Module<HTMLDivElement> {
         this.chatInput = new ChatInput()
         this.add(this.chatInput)
     }
+
+    public sendMessage(message: string) {
+        this.chatHistory.addMessage(message)
+        this.chatHistory.addMessage("TODO send message to server and update the message using streaming", "UI")
+    }
 }

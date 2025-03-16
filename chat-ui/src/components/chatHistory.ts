@@ -6,7 +6,9 @@ export class EditBar extends Module<HTMLDivElement> {
     public constructor(isModel: boolean) {
         super("div", "", "edit-bar")
         if (isModel) {
-            this.htmlElement.innerHTML = "TODO"
+            this.htmlElement.innerHTML = "TODO (Model Edit)"
+        } else {
+            this.htmlElement.innerHTML = "TODO (User Edit)"
         }
     }
 }
@@ -31,12 +33,13 @@ export class ChatMessage extends Module<HTMLDivElement> {
 }
 
 export class ChatHistory extends Module<HTMLDivElement> {
-    public constructor() {
+    public constructor(debug: boolean = false) {
         super("div", "", "chat-history")
-        this.add(new ChatMessage("How can I help you today?", "Quack-Norris"))
-        this.add(new ChatMessage("What is 2+2?"))
-        this.add(new ChatMessage("2 + 2 = 4", "Quack-Norris"))
-        this.add(new ChatMessage("Are you sure, can you explain me why?"))
+        if (debug) {
+            this.addMessage("How can I help you today?", "Quack-Norris")
+            this.addMessage("What is 2+2?")
+            this.addMessage("2 + 2 = 4", "Quack-Norris")
+            this.addMessage("Are you sure, can you explain me why?")
         let md = `You're right to question! It's good to be curious. Let's break down why 2 + 2 = 4.
 
 * **What does "plus" mean?** "Plus" (the + symbol) means we're combining things together.
@@ -60,6 +63,14 @@ Therefore, 2 + 2 = 4.
 
 
 Do you want me to explain it another way, or maybe use a different example?`
-        this.add(new ChatMessage(md, "Quack-Norris"))
+            this.addMessage(md, "Quack-Norris")
+        }
+    }
+
+    public addMessage(message: string, model: string = "") {
+        this.add(new ChatMessage(message, model))
+        setTimeout(() => {
+            this.htmlElement.scrollTo(0, this.htmlElement.scrollHeight);
+        }, 0);
     }
 }

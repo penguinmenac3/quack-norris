@@ -1,6 +1,7 @@
 import "./chatInput.css"
 import { iconCall, iconDropdown, iconMicrophone, iconPlus, iconSend, iconTool } from "../icons";
 import { Module } from "../webui/module";
+import { Chat } from "./chat";
 
 export class ActionButton extends Module<HTMLSpanElement> {
     public constructor(icon: string) {
@@ -77,7 +78,8 @@ export class ChatInput extends Module<HTMLDivElement> {
 
         send.onAction = () => {
             let text = input.htmlElement.value
-            alert("TODO SEND: " + text)
+            let chat = this.parent! as Chat
+            chat.sendMessage(text)
             input.htmlElement.value = ""
             onUpdateInput()
         }
