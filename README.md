@@ -37,7 +37,7 @@ If you want to add quack norris to the autostart or the startmenu on windows, si
 
 Config files can be created in the current working directory or in your users config folder `~/.config/quack_norris/`.
 
-In your `server.json` and in your `ui.json` you can configure the server host and port.
+In your `server.json` you can configure the server host and port.
 ```json
 {
   "host": "127.0.0.1",
@@ -45,10 +45,18 @@ In your `server.json` and in your `ui.json` you can configure the server host an
 }
 ```
 
-Additionally, in your `ui.json` you can configure the chat application (if you want a custom one) launcher look and feel.
+In your `ui.json` you can configure the chat OpenAI style API endpoint to use.
 ```json
 {
-  ...
+  "apiEndpoint": "http://127.0.0.1:1337",
+  "apiKey": "INSERT_YOUR_KEY_HERE",
+  "model": "quack-norris",
+}
+```
+
+In the `ui.json`, you can even replace the url the launcher opens as a chat app and customize the icon.
+```json
+{
   "chat_url": "https://chatgpt.com/",
   "launcher_ctrl_click_to_exit": false,
   "launcher_size": [84, 84],
@@ -80,8 +88,8 @@ However, to access all features, you need to know the following:
 
 * Server
   - [X] Provide OpenAI Rest API Endpoint
-  - [ ] Route requests to LLM via an OpenAI API (proxy)
-  - [ ] Route quack norris model variants to custom chat handler
+  - [X] Route requests to LLM via an OpenAI API (proxy)
+  - [X] Route quack norris model variants to custom chat handler
   - [ ] Implement commands for quack norris chat handler
   - [ ] Implement named and unnamed chats (history management)
   - [ ] Implement global chat mangling
@@ -106,19 +114,21 @@ However, to access all features, you need to know the following:
   - [ ] Provide Phone Call endpoint (call via phone and AI will respond to you)
   - [ ] Startup/boot a model server, if needed (e.g. raspi starts gaming PC)
 * [ ] UI
-  - [ ] A floating duck (movable)
-  - [ ] Double click opens a chat window with buttons for actions
+  - [X] A floating duck (movable)
+  - [X] Click opens a chat window with buttons for actions
   - Implement Actions:
-    * [ ] Take Screenshot (into chat input)
+    * [ ] Manage Chats
+      - [X] New chat
+      - [ ] Download current chat as markdown
+      - [ ] Reopen old conversation
+      - [ ] Change model for current chat
+    * [ ] Allow pasting of a screenshot
+    * [ ] Allow uploading of an image
     * [ ] Transcribe Audio (into chat input)
       - use transcript to chat with AI
       - use "Document Writer" tool to take notes
     * [ ] Call (transcript is sent after a pause, response is read and it listenes again for user input)
-    * [ ] Manage Chats
-      - New Chat
-      - Switch/Change Chat
-      - Archive Chat
-      - Change Chat's Model
+
 
 
 ## 👥 Contributing
