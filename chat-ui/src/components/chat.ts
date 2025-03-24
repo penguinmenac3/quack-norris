@@ -24,7 +24,10 @@ export class Chat extends Module<HTMLDivElement> {
                 "content": message.getText()
             })
         }
-        let chatMessage = this.chatHistory.addMessage("", model)
+        // Create an empty message (that is not saved)
+        let chatMessage = this.chatHistory.addMessage("", model, false)
+
+        // Stream in the result into the message entity
         const response = await fetch(this.apiEndpoint + "/chat/completions", {
             method: 'POST',
             headers: {
@@ -59,5 +62,12 @@ export class Chat extends Module<HTMLDivElement> {
             });
             if (dataDone) break;
         }
+
+        // When streaming completed, save the chat history again
+        this.chatHistory.saveMessages()
+    }
+
+    public newConversation() {
+        this.chatHistory.clear()
     }
 }

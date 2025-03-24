@@ -1,5 +1,5 @@
 import "./chatInput.css"
-import { iconCall, iconDropdown, iconMicrophone, iconPlus, iconSend, iconTool } from "../icons";
+import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool } from "../icons";
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
 
@@ -36,6 +36,8 @@ export class ChatInput extends Module<HTMLDivElement> {
         let tools = new DropdownButton(iconTool + " Tools " + iconDropdown)
         settings.add(tools)
         toolbar.add(settings)
+        let newConversation = new ActionButton(iconTrash)
+        toolbar.add(newConversation)
         let microphone = new ActionButton(iconMicrophone)
         toolbar.add(microphone)
         let call = new ActionButton(iconCall)
@@ -83,6 +85,11 @@ export class ChatInput extends Module<HTMLDivElement> {
             chat.sendMessage(text, model)
             input.htmlElement.value = ""
             onUpdateInput()
+        }
+
+        newConversation.onAction = () => {
+            let chat = this.parent! as Chat
+            chat.newConversation()
         }
     }
 }

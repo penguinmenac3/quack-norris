@@ -44,6 +44,10 @@ export class ChatMessage extends Module<HTMLDivElement> {
         return this.md_content
     }
 
+    public getModel(): string {
+        return this.model
+    }
+
     public getRole(): string {
         if (this.model == "") {
             return "user"
@@ -87,20 +91,46 @@ Therefore, 2 + 2 = 4.
 
 Do you want me to explain it another way, or maybe use a different example?`
             this.addMessage(md, "Quack-Norris")
+        } else {
+            this.loadMessages()
         }
     }
 
-    public addMessage(message: string, model: string = "") {
+    public addMessage(message: string, model: string = "", save: boolean = true) {
         let chatMessage = new ChatMessage(message, model)
         this.chatMessages.push(chatMessage)
         this.add(chatMessage)
         setTimeout(() => {
             this.htmlElement.scrollTo(0, this.htmlElement.scrollHeight);
         }, 0);
+        if (save) {
+            this.saveMessages()
+        }
         return chatMessage;
     }
 
     public getMessages() {
         return this.chatMessages
+    }
+
+    public saveMessages() {
+        let messages = []
+        for (let message of this.chatMessages) {
+            messages.push({ "text": message.getText(), "model": message.getModel() })
+        }
+        localStorage.setItem("quack-history", JSON.stringify(messages))
+    }
+
+    public loadMessages() {
+        let messages = JSON.parse(localStorage.getItem("quack-history") || "[]")
+        this.htmlElement.innerHTML = ""
+        for (let message of messages) {
+            this.addMessage(message["text"], message["model"], false)
+        }
+    }
+
+    public clear() {
+        localStorage.setItem("quack-history", JSON.stringify([]))
+        this.loadMessages()
     }
 }
