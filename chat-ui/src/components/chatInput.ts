@@ -22,6 +22,9 @@ export class DropdownButton extends Module<HTMLSpanElement> {
 
 
 export class ChatInput extends Module<HTMLDivElement> {
+    private model: string = "quack-norris"
+    private llm: DropdownButton
+
     public constructor() {
         super("div", "", "chat-input");
         let container = new Module<HTMLDivElement>("div", "", "container")
@@ -31,8 +34,9 @@ export class ChatInput extends Module<HTMLDivElement> {
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
         let settings = new Module<HTMLSpanElement>("span", "", "settings")
-        let llm = new DropdownButton("quack-norris " + iconDropdown)
-        settings.add(llm)
+        this.llm = new DropdownButton("")
+        this.llm.htmlElement.innerHTML = this.model + " " + iconDropdown
+        settings.add(this.llm)
         let tools = new DropdownButton(iconTool + " Tools " + iconDropdown)
         settings.add(tools)
         toolbar.add(settings)
@@ -81,8 +85,7 @@ export class ChatInput extends Module<HTMLDivElement> {
         send.onAction = () => {
             let text = input.htmlElement.value
             let chat = this.parent! as Chat
-            let model = "quack-norris"
-            chat.sendMessage(text, model)
+            chat.sendMessage(text, this.model)
             input.htmlElement.value = ""
             onUpdateInput()
         }
@@ -91,5 +94,10 @@ export class ChatInput extends Module<HTMLDivElement> {
             let chat = this.parent! as Chat
             chat.newConversation()
         }
+    }
+
+    public setModel(model: string) {
+        this.model = model
+        this.llm.htmlElement.innerHTML = this.model + " " + iconDropdown
     }
 }
