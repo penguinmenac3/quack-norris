@@ -152,6 +152,7 @@ rm dist/favicon.kra
 git add -f dist
 git commit -m "Build gh-pages."
 git push
+cd ..
 git subtree push --prefix chat-ui/dist origin gh-pages
 ```
 
