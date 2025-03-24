@@ -33,6 +33,13 @@ quack-norris-ui
 
 If you want to add quack norris to the autostart or the startmenu on windows, simply find the `quack-norris-ui.exe`, wherever your python installation put it and add a **link** to it to your startmenu (in the right click settings, you can even configure an icon). You can find the startmenu here: `C:\Users\YOUR_USERNAME\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`.
 
+### Enable CORS for OLLAMA
+
+When using ollama you have to enable CORS so that the app cann access it from the webui.
+To achieve this, add `OLLAMA_ORIGINS=*` to the environment variables.
+
+![Environment variables on windows](images/OllamaCORSConfig.png)
+
 ### 🎨 Config
 
 Config files can be created in the current working directory or in your users config folder `~/.config/quack_norris/`.
