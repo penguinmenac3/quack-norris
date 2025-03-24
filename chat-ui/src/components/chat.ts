@@ -25,6 +25,7 @@ export class Chat extends Module<HTMLDivElement> {
         if (kwargs.model) {
             this.chatInput.setModel(kwargs.model)
         }
+        window.location.hash = "chat"
     }
 
     public async sendMessage(message: string, model: string) {
