@@ -19,17 +19,9 @@ def ui():
         type=str,
         help="A host to overwrite the config temporarily.",
     )
-    parser.add_argument(
-        "--port",
-        required=False,
-        default=config["port"],
-        type=int,
-        help="A port to overwrite the config temporarily.",
-    )
 
     args = parser.parse_args()
     config["host"] = args.host
-    config["port"] = args.port
     config["debug"] = args.debug
     _create_ui(config=config)
 

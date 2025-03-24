@@ -1,5 +1,5 @@
 import "./chat.css"
-import { Module } from "../webui/module";
+import { KWARGS, Module } from "../webui/module";
 import { ChatInput } from "./chatInput";
 import { ChatHistory } from "./chatHistory";
 
@@ -13,6 +13,18 @@ export class Chat extends Module<HTMLDivElement> {
         this.add(this.chatHistory)
         this.chatInput = new ChatInput()
         this.add(this.chatInput)
+    }
+
+    public update(kwargs: KWARGS, _changedPage: boolean): void {
+        if (kwargs.apiEndpoint) {
+            this.apiEndpoint = kwargs.apiEndpoint
+        }
+        if (kwargs.apiKey) {
+            this.apiKey = kwargs.apiKey
+        }
+        if (kwargs.model) {
+            this.chatInput.setModel(kwargs.model)
+        }
     }
 
     public async sendMessage(message: string, model: string) {
