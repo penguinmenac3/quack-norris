@@ -141,6 +141,19 @@ Hence, please try to not include unnescessary dependencies, just because they sa
 When in doubt, if I will like your contribution, check the [.continuerules](.continuerules) for AI assistants.
 The rules for AI will also apply to human contributors.
 
+### Building the Chat-UI
+
+Run the build command, add and commit the dist folder and then push this folger to gh-pages.
+
+```
+cd chat-ui
+npm run build
+rm dist/favicon.kra
+git add -f dist
+git commit -m "Build gh-pages."
+git push
+git subtree push --prefix chat-ui/dist origin gh-pages
+```
 
 ## ⚖️ License
 
