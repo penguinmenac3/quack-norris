@@ -6,9 +6,9 @@ export class EditBar extends Module<HTMLDivElement> {
     public constructor(isModel: boolean) {
         super("div", "", "edit-bar")
         if (isModel) {
-            this.htmlElement.innerHTML = "TODO (Model Edit)"
+            this.htmlElement.innerHTML = "" //"TODO (Model Edit)"
         } else {
-            this.htmlElement.innerHTML = "TODO (User Edit)"
+            this.htmlElement.innerHTML = "" //"TODO (User Edit)"
         }
     }
 }
