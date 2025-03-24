@@ -31,7 +31,7 @@ export class ChatInput extends Module<HTMLDivElement> {
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
         let settings = new Module<HTMLSpanElement>("span", "", "settings")
-        let llm = new DropdownButton("Quack Norris " + iconDropdown)
+        let llm = new DropdownButton("quack-norris " + iconDropdown)
         settings.add(llm)
         let tools = new DropdownButton(iconTool + " Tools " + iconDropdown)
         settings.add(tools)
@@ -79,7 +79,8 @@ export class ChatInput extends Module<HTMLDivElement> {
         send.onAction = () => {
             let text = input.htmlElement.value
             let chat = this.parent! as Chat
-            chat.sendMessage(text)
+            let model = "quack-norris"
+            chat.sendMessage(text, model)
             input.htmlElement.value = ""
             onUpdateInput()
         }

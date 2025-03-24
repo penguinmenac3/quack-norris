@@ -14,6 +14,8 @@ export class EditBar extends Module<HTMLDivElement> {
 }
 
 export class ChatMessage extends Module<HTMLDivElement> {
+    private content: Module<HTMLDivElement>
+
     public constructor(private md_content: string, private model: string = "") {
         super("div", "", "message-container")
         if (model != "") {
@@ -23,16 +25,37 @@ export class ChatMessage extends Module<HTMLDivElement> {
             this.setClass("from-user")
         }
         let html = marked.parse(md_content) as string
-        this.add(new Module<HTMLDivElement>("div", html, "message-body"))
+        this.content = new Module<HTMLDivElement>("div", html, "message-body")
+        this.add(this.content)
         if (model != "") {
             this.add(new EditBar(true))
         } else {
             this.add(new EditBar(false))
         }
     }
+
+    public appendText(text: string) {
+        this.md_content += text
+        let html = marked.parse(this.md_content) as string
+        this.content.htmlElement.innerHTML = html
+    }
+
+    public getText(): string {
+        return this.md_content
+    }
+
+    public getRole(): string {
+        if (this.model == "") {
+            return "user"
+        } else {
+            return "assistant"
+        }
+    }
 }
 
 export class ChatHistory extends Module<HTMLDivElement> {
+    private chatMessages: ChatMessage[] = []
+
     public constructor(debug: boolean = false) {
         super("div", "", "chat-history")
         if (debug) {
@@ -68,9 +91,16 @@ Do you want me to explain it another way, or maybe use a different example?`
     }
 
     public addMessage(message: string, model: string = "") {
-        this.add(new ChatMessage(message, model))
+        let chatMessage = new ChatMessage(message, model)
+        this.chatMessages.push(chatMessage)
+        this.add(chatMessage)
         setTimeout(() => {
             this.htmlElement.scrollTo(0, this.htmlElement.scrollHeight);
         }, 0);
+        return chatMessage;
+    }
+
+    public getMessages() {
+        return this.chatMessages
     }
 }

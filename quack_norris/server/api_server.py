@@ -4,6 +4,7 @@ from uuid import uuid4
 import json
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
 from quack_norris.common._types import ChatMessage, ChatCompletionRequest
@@ -14,6 +15,21 @@ DEBUG = False
 
 app = FastAPI(title="QuackNorris-Server")
 llm = QuackNorris()
+
+# Add CORS middleware
+origins = [
+    "http://localhost:5173",  # Your frontend's origin
+    "http://localhost",  # Allow from localhost (useful for development)
+    "*",  #  (Use with caution - see notes below)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Specify allowed methods
+    allow_headers=["*"],  # Specify allowed headers (use with caution)
+    allow_credentials=True,  # Allow cookies (if needed)
+)
 
 # def require_auth(func):
 #     @wraps(func)
