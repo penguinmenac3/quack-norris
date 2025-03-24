@@ -20,22 +20,23 @@ class ChatWindow(QMainWindow):
         self.setCentralWidget(self.web_view)
 
         # Set url for the PWA quack-norris
-        host = config.get("host", "")
-        token = config.get("token", "")
+        apiEndpoint = config.get("apiEndpoint", "")
+        apiKey = config.get("apiKey", "")
         model = config.get("model", "")
         query = ""
-        if host != "" or token != "":
-            query = urllib.parse.urlencode(dict(apiEndpoint=host, apiKey=token, model=model))
+        if apiEndpoint != "" or apiKey != "":
+            query = urllib.parse.urlencode(
+                dict(apiEndpoint=apiEndpoint, apiKey=apiKey, model=model)
+            )
         if config["debug"]:
             # If debugging, use local url, so we can show the vite server content
-            self.web_view.setUrl(
-                "http://localhost:5173/quack-norris/#chat&{query}".format(query=query)
-            )
+            self.url = "http://localhost:5173/quack-norris/#chat&{query}".format(query=query)
         else:
             default_url = (
                 "https://penguinmenac3.github.io/quack-norris/#chat&{query}"  # PLACEHOLDER
             )
-            self.web_view.setUrl(config.get("chat_url", default_url).format(query=query))
+            self.url = config.get("chat_url", default_url).format(query=query)
+        self.web_view.setUrl(self.url)
 
     def align_with_launcher(self, x, y, w, h, screen_x, screen_y, screen_w, screen_h):
         win_h = min(screen_h / 2 + h / 2, 800)

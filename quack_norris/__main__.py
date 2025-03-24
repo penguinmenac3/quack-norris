@@ -12,16 +12,8 @@ def ui():
     parser = ArgumentParser("quack-norris-ui")
     config = read_config("ui.json")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument(
-        "--host",
-        required=False,
-        default=config["host"],
-        type=str,
-        help="A host to overwrite the config temporarily.",
-    )
 
     args = parser.parse_args()
-    config["host"] = args.host
     config["debug"] = args.debug
     _create_ui(config=config)
 
