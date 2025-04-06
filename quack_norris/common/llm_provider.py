@@ -27,7 +27,12 @@ class OpenAI(LLM):
 
     def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
         try:
-            response = self._client.chat.completions.create(**request.model_dump())
+            params = request.model_dump()
+            if "max_tokens" in params and params["max_tokens"] == -1:
+                del params["max_tokens"]
+            if "temperature" in params and params["temperature"] == -1:
+                del params["temperature"]
+            response = self._client.chat.completions.create(**params)
         except openai.NotFoundError as e:
             raise RuntimeError(str(e))
         if request.stream:
