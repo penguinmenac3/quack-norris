@@ -1,5 +1,4 @@
-from functools import wraps
-from time import time, sleep
+from time import time
 from uuid import uuid4
 import json
 
@@ -8,19 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
 from quack_norris.common._types import ChatMessage, ChatCompletionRequest
-from quack_norris.common.llm_provider import QuackNorris
-from quack_norris.server.user import User, get_users
+from quack_norris.common.quack_norris import QuackNorris
 
 DEBUG = False
 
 app = FastAPI(title="QuackNorris-Server")
-llm = QuackNorris()
+quack = QuackNorris()
 
 # Add CORS middleware
 origins = [
     "http://localhost:5173",  # Your frontend's origin
     "http://localhost",  # Allow from localhost (useful for development)
-    "*",  #  (Use with caution - see notes below)
+    "*",  # (Use with caution - see notes below)
 ]
 
 app.add_middleware(
@@ -97,7 +95,7 @@ async def chat_completions(request: ChatCompletionRequest):
         print(f"REQUEST: {request}")
     reason = "stop"
     try:
-        response = llm.chat(request)
+        response = quack.chat(request)
     except RuntimeError as e:
         response = str(e)
         reason = "error"

@@ -1,8 +1,10 @@
 from typing import Generator, List
+import requests
 import openai
 from openai import OpenAI as _OpenAIAPI
 
 from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest
+from quack_norris.common.config import read_config
 
 
 class LLM(object):
@@ -15,7 +17,8 @@ class LLM(object):
 
 
 class OpenAI(LLM):
-    def __init__(self, base_url="http://localhost:11434/v1", api_key="ollama"):
+
+    def __init__(self, base_url, api_key):
         self._client = _OpenAIAPI(base_url=base_url, api_key=api_key)
 
     def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
@@ -40,21 +43,36 @@ class OpenAI(LLM):
             yield chunk.choices[0].delta.content or ""
 
 
-class QuackNorris(LLM):
-    def __init__(self, llm: LLM | None = None, default_model: str = "gemma3:12b"):
-        self._llm = llm or OpenAI()
-        self._default_model = default_model
+class LLMMultiplexer(LLM):
+    def __init__(self):
+        config = read_config("config.json")
+        self._llms = {}
+        self._llm_models = {}
+        for key, details in config["llms"].items():
+            if key == "ollama" and details["model"] == "AUTODETECT":
+                # FIXME detect all available models
+                modelListEndpoint = details["apiEndpoint"] + "/api/tags"
+                response = requests.get(modelListEndpoint)
+                response.raise_for_status()
+                data = response.json()
+                for model in data["models"]:
+                    name = model["name"]
+                    self._llm_models[name] = name
+                    apiEndpoint = details["apiEndpoint"] + "/v1"
+                    self._llms[name] = OpenAI(base_url=apiEndpoint, api_key=details["apiKey"])
+            else:
+                self._llm_models[key] = details["model"]
+                self._llms[key] = OpenAI(base_url=details["apiEndpoint"], api_key=details["apiKey"])
 
     def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
-        if request.model != "quack-norris":
-            return self._llm.embeddings(request)
-        else:
-            request.model = "nomic-embed-text"
-            return self._llm.embeddings(request)
+        model_id = request.model
+        request.model = self._llm_models[model_id]
+        return self._llms[model_id].embeddings(request)
 
     def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
-        if request.model != "quack-norris":
-            return self._llm.chat(request)
-        else:
-            request.model = self._default_model
-            return self._llm.chat(request)
+        model_id = request.model
+        request.model = self._llm_models[model_id]
+        return self._llms[model_id].chat(request)
+
+    def get_models(self) -> list[str]:
+        return list(self._llms.keys())

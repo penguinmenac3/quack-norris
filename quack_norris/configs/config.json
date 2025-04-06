@@ -1,6 +1,14 @@
 {
     "model": "quack-norris",
+    "default_model": "gemma3:12b",
     "host": "localhost",
     "port": 11337,
-    "debug": false
+    "debug": false,
+    "llms": {
+        "ollama": {
+            "apiEndpoint": "http://localhost:11434",
+            "apiKey": "ollama",
+            "model": "AUTODETECT"
+        }
+    }
 }
