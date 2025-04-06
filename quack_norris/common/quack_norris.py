@@ -24,6 +24,21 @@ class QuackNorris(LLM):
             return self._llm.chat(request)
         else:
             request.model = self._default_model
+            msg = request.messages[-1].content.strip()
+            words = msg.replace("\n", " ").split(" ")
+            # Hanlde model check command
+            if len(words) >= 1 and "/model" == words[-1]:
+                return f"Current model is '{self._default_model}'."
+            # Hanlde model switch command
+            if len(words) >= 2 and "/model" == words[-2]:
+                model = words[-1]
+                models = self._llm.get_models()
+                if model in models:
+                    self._default_model = model
+                    return f"Switched model to '{model}'."
+                else:
+                    model_list = "\n* ".join([""] + models)
+                    return f"Model '{model}' not available.\n\nAvailable models:{model_list}"
             return self._llm.chat(request)
 
     def get_models(self) -> list[str]:
