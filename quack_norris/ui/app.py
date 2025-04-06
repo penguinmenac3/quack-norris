@@ -46,7 +46,7 @@ def main(config: dict[str, Any]):
         launcher.reset_position()
 
     setup_system_tray(app, on_hide, on_reset, duck_path)
-    sys.exit(app.exec())
+    return app.exec()
 
 
 def setup_system_tray(app: QApplication, on_hide: Callable, on_reset: Callable, duck_path: str):
@@ -67,7 +67,7 @@ def setup_system_tray(app: QApplication, on_hide: Callable, on_reset: Callable, 
     tray_menu.addAction(reset_action)
 
     exit_action = QAction("Exit", app)
-    exit_action.triggered.connect(lambda: sys.exit(0))
+    exit_action.triggered.connect(lambda: app.exit(0))
     tray_menu.addAction(exit_action)
 
     # Set up the system tray
