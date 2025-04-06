@@ -1,46 +1,72 @@
+import subprocess
 import sys
-from argparse import ArgumentParser
-
+import socket
 from setproctitle import setproctitle
 
 from quack_norris.common.config import read_config
 
 
-def ui():
+def ui(config=None):
     from quack_norris.ui.app import main as _create_ui
-    setproctitle("quack-norris-ui")
-    parser = ArgumentParser("quack-norris-ui")
-    config = read_config("ui.json")
-    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
-    args = parser.parse_args()
-    config["debug"] = args.debug
-    _create_ui(config=config)
+    setproctitle("quack-norris-ui")
+    if config is None:
+        config = read_config("config.json", overwrites=sys.argv[1:])
+
+    server_process = None
+    if is_port_available(config["port"]):
+        server_process = start_server_as_process(config)
+
+    exit_code = _create_ui(config=config)
+    if server_process is not None:
+        server_process.kill()
+    sys.exit(exit_code)
+
+
+def is_port_available(port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(("localhost", port))
+        return True
+    except socket.error:
+        return False
+    finally:
+        sock.close()
+
+
+def start_server_as_process(config):
+    """Starts the server as a subprocess."""
+    print("Starting Server")
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    p = subprocess.Popen(
+        [
+            "quack-norris-server",
+            f"--host={config['host']}",
+            f"--port={config['port']}",
+            f"--debug={config['debug']}",
+        ],
+        startupinfo=startupinfo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.PIPE,
+    )
+    return p
 
 
 def server():
     import uvicorn
 
     setproctitle("quack-norris-server")
-    parser = ArgumentParser("quack-norris-server")
-    config = read_config("server.json")
-    parser.add_argument(
-        "--host",
-        required=False,
-        default=config["host"],
-        type=str,
-        help="A host to overwrite the config temporarily.",
+    # Only load server config, if none is provided
+    config = read_config("config.json", overwrites=sys.argv[1:])
+
+    uvicorn.run(
+        "quack_norris.server.api_server:app",
+        host=config["host"],
+        port=config["port"],
+        reload=config["debug"],
     )
-    parser.add_argument(
-        "--port",
-        required=False,
-        default=config["port"],
-        type=int,
-        help="A port to overwrite the config temporarily.",
-    )
-    parser.add_argument("--debug", action="store_true", help="Run the flask server in debug mode.")
-    args = parser.parse_args()
-    uvicorn.run("quack_norris.server.api_server:app", host=args.host, port=args.port, reload=True)
 
 
 def main():
