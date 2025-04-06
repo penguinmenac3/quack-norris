@@ -20,13 +20,13 @@ class ChatWindow(QMainWindow):
         self.setCentralWidget(self.web_view)
 
         # Set url for the PWA quack-norris
-        apiEndpoint = config.get("apiEndpoint", "")
-        apiKey = config.get("apiKey", "")
+        host = config.get("host", "")
+        port = config.get("port", "")
         model = config.get("model", "")
         query = ""
-        if apiEndpoint != "" or apiKey != "":
+        if host != "" and port != "":
             query = urllib.parse.urlencode(
-                dict(apiEndpoint=apiEndpoint, apiKey=apiKey, model=model)
+                dict(apiEndpoint=f"http://{host}:{port}", apiKey="quack-norris", model=model)
             )
         if config["debug"]:
             # If debugging, use local url, so we can show the vite server content
