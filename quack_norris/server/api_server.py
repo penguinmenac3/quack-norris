@@ -103,7 +103,9 @@ def openai_chat_completions(request: ChatCompletionRequest):
     except RuntimeError as e:
         response = str(e)
         reason = "error"
-    if not isinstance(response, str):
+    if request.stream:
+        if isinstance(response, str):
+            response = [response]
         return StreamingResponse(
             _wrap_openai_chat_generator(response, request.model), media_type="text/event-stream"
         )
@@ -162,7 +164,9 @@ def ollam_chat_completions(request: OllamaChatCompletionRequest):
     except RuntimeError as e:
         response = str(e)
         reason = "error"
-    if not isinstance(response, str):
+    if request.stream:
+        if isinstance(response, str):
+            response = [response]
         return StreamingResponse(
             _wrap_ollama_chat_generator(response, request.model),
             media_type="application/x-ndjson",
