@@ -1,0 +1,7 @@
+{
+    "apiEndpoint": "http://127.0.0.1:11337",
+    "model": "quack-norris",
+    "host": "127.0.0.1",
+    "port": 11337,
+    "debug": false
+}
