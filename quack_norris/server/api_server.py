@@ -6,7 +6,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
-from quack_norris.common._types import ChatMessage, ChatCompletionRequest
+from quack_norris.common._types import (
+    ChatMessage,
+    ChatCompletionRequest,
+    OllamaChatCompletionRequest,
+)
 from quack_norris.common.quack_norris import QuackNorris
 
 DEBUG = False
@@ -72,7 +76,7 @@ app.add_middleware(
 #     }
 
 
-async def _wrap_chat_generator(stream, model):
+def _wrap_openai_chat_generator(stream, model):
     for i, token in enumerate(stream):
         chunk = {
             "id": i,
@@ -90,7 +94,7 @@ async def _wrap_chat_generator(stream, model):
 
 
 @app.post("/chat/completions")
-async def chat_completions(request: ChatCompletionRequest):
+def openai_chat_completions(request: ChatCompletionRequest):
     if DEBUG:
         print(f"REQUEST: {request}")
     reason = "stop"
@@ -101,7 +105,7 @@ async def chat_completions(request: ChatCompletionRequest):
         reason = "error"
     if not isinstance(response, str):
         return StreamingResponse(
-            _wrap_chat_generator(response, request.model), media_type="application/x-ndjson"
+            _wrap_openai_chat_generator(response, request.model), media_type="text/event-stream"
         )
     response = {
         "id": str(uuid4()),
@@ -112,6 +116,73 @@ async def chat_completions(request: ChatCompletionRequest):
             {"finish_reason": reason, "message": ChatMessage(role="assistant", content=response)}
         ],
     }
+    if DEBUG:
+        print(f"RESPONSE: {json.dumps(response)}")
+    return response
+
+
+def _wrap_ollama_chat_generator(stream, model):
+    for token in stream:
+        chunk = {
+            "model": model,
+            "created": str(time()),
+            "message": {
+                "role": "assistant",
+                "content": token,
+                "images": None,
+            },
+            "done": False,
+        }
+        if DEBUG:
+            print(f"{json.dumps(chunk)}")
+        yield f"{json.dumps(chunk)}\n"
+    final_chunk = {
+        "model": model,
+        "created": str(time()),
+        "message": {
+            "role": "assistant",
+            "content": "",
+            "images": None,
+        },
+        "done": True,
+        "done_reason": "stop",
+    }
+    if DEBUG:
+        print(f"{json.dumps(final_chunk)}")
+    yield f"{json.dumps(final_chunk)}\n"
+
+
+@app.post("/api/chat")
+def ollam_chat_completions(request: OllamaChatCompletionRequest):
+    if DEBUG:
+        print(f"REQUEST: {request}")
+    reason = "stop"
+    try:
+        response = quack.chat(request)
+    except RuntimeError as e:
+        response = str(e)
+        reason = "error"
+    if not isinstance(response, str):
+        return StreamingResponse(
+            _wrap_ollama_chat_generator(response, request.model),
+            media_type="application/x-ndjson",
+            headers={"Transfer-Encoding": "chunked"},
+        )
+    response = {
+        "model": request.model,
+        "created_at": str(time()),
+        "message": {"role": "assistant", "content": response},
+        "done": True,
+        "done_reason": reason,
+    }
+    if DEBUG:
+        print(f"RESPONSE: {json.dumps(response)}")
+    return response
+
+
+@app.get("/api/tags")
+def models():
+    response = {"models": [{"name": model, "details": {}} for model in quack.get_models()]}
     if DEBUG:
         print(f"RESPONSE: {json.dumps(response)}")
     return response
