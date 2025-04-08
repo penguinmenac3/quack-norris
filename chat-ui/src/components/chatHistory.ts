@@ -96,17 +96,44 @@ Do you want me to explain it another way, or maybe use a different example?`
         }
     }
 
+    private isTemporary(message: string, model: string = "") {
+        if (message.startsWith("/model") && model == "")
+            return true
+
+        if (message.startsWith("Current model is ") && model != "")
+            return true
+
+        if (message.startsWith("Switched model to '") && model != "")
+            return true
+
+        if (message.startsWith("Model '") && message.includes("' not available.") && model != "")
+            return true
+
+        return false
+    }
+
     public addMessage(message: string, model: string = "", save: boolean = true) {
+        // Add the chat message and give it time to appear
         let chatMessage = new ChatMessage(message, model)
         this.chatMessages.push(chatMessage)
         this.add(chatMessage)
         setTimeout(() => {
             this.htmlElement.scrollTo(0, this.htmlElement.scrollHeight);
-        }, 0);
+        }, 0)
+        // Delete temporary messages again
+        setTimeout(() => {
+            if (this.isTemporary(chatMessage.getText(), model)) {
+                chatMessage.hide()
+                let idx = this.chatMessages.indexOf(chatMessage)
+                this.chatMessages.splice(idx, 1)
+                this.saveMessages()
+            }
+        }, 5000)
+        // Save changes
         if (save) {
             this.saveMessages()
         }
-        return chatMessage;
+        return chatMessage
     }
 
     public getMessages() {
