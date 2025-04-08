@@ -124,6 +124,7 @@ Do you want me to explain it another way, or maybe use a different example?`
     public loadMessages() {
         let messages = JSON.parse(localStorage.getItem("quack-history") || "[]")
         this.htmlElement.innerHTML = ""
+        this.chatMessages = []
         for (let message of messages) {
             this.addMessage(message["text"], message["model"], false)
         }
