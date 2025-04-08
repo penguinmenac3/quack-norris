@@ -1,6 +1,7 @@
 from typing import Generator, List
 import requests
 import openai
+from openai import AzureOpenAI as _AzureAPI
 from openai import OpenAI as _OpenAIAPI
 
 from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest
@@ -18,8 +19,11 @@ class LLM(object):
 
 class OpenAI(LLM):
 
-    def __init__(self, base_url, api_key):
-        self._client = _OpenAIAPI(base_url=base_url, api_key=api_key)
+    def __init__(self, base_url, api_key, is_azure=False):
+        if not is_azure:
+            self._client = _OpenAIAPI(base_url=base_url, api_key=api_key)
+        else:
+            self._client = _AzureAPI(api_version="2024-10-21", base_url=base_url, api_key=api_key)
 
     def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
         response = self._client.embeddings.create(**request.model_dump())
@@ -55,7 +59,6 @@ class LLMMultiplexer(LLM):
         self._llm_models = {}
         for key, details in config["llms"].items():
             if key == "ollama" and details["model"] == "AUTODETECT":
-                # FIXME detect all available models
                 modelListEndpoint = details["apiEndpoint"] + "/api/tags"
                 response = requests.get(modelListEndpoint)
                 response.raise_for_status()
@@ -67,7 +70,10 @@ class LLMMultiplexer(LLM):
                     self._llms[name] = OpenAI(base_url=apiEndpoint, api_key=details["apiKey"])
             else:
                 self._llm_models[key] = details["model"]
-                self._llms[key] = OpenAI(base_url=details["apiEndpoint"], api_key=details["apiKey"])
+                is_azure = "is_azure" in details and details["is_azure"]
+                self._llms[key] = OpenAI(
+                    base_url=details["apiEndpoint"], api_key=details["apiKey"], is_azure=is_azure
+                )
 
     def embeddings(self, request: EmbeddingRequest) -> List[List[float]]:
         model_id = request.model
