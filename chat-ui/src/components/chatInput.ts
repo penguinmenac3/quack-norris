@@ -1,5 +1,5 @@
 import "./chatInput.css"
-import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool } from "../icons";
+import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool, iconRoles, iconAIModel } from "../icons";
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
 
@@ -35,8 +35,10 @@ export class ChatInput extends Module<HTMLDivElement> {
         toolbar.add(addMedia)
         let settings = new Module<HTMLSpanElement>("span", "", "settings")
         this.llm = new DropdownButton("")
-        this.llm.htmlElement.innerHTML = this.model + " " + iconDropdown
+        this.setModel(this.model)
         settings.add(this.llm)
+        let role = new DropdownButton(iconRoles + " General " + iconDropdown)
+        settings.add(role)
         let tools = new DropdownButton(iconTool + " Tools " + iconDropdown)
         settings.add(tools)
         toolbar.add(settings)
@@ -98,6 +100,6 @@ export class ChatInput extends Module<HTMLDivElement> {
 
     public setModel(model: string) {
         this.model = model
-        this.llm.htmlElement.innerHTML = this.model + " " + iconDropdown
+        this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
     }
 }
