@@ -71,6 +71,7 @@ export class Chat extends Module<HTMLDivElement> {
                 }
                 const json = JSON.parse(data.substring(6));
                 let text = json.choices[0]["delta"]["content"]
+                chatMessage.setModel(json.model)
                 chatMessage.appendText(text)
             });
             if (dataDone) break;
