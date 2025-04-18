@@ -20,6 +20,10 @@ class OllamaChatCompletionRequest(ChatCompletionRequest):
     stream: Optional[bool] = True
 
 
+class OllamaModelInfoRequest(BaseModel):
+    name: str
+
+
 class EmbeddingRequest(BaseModel):
     model: str
     input: str | List[str]

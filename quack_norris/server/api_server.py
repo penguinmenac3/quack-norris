@@ -2,7 +2,9 @@ from time import time
 from uuid import uuid4
 import json
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
@@ -10,6 +12,7 @@ from quack_norris.common._types import (
     ChatMessage,
     ChatCompletionRequest,
     OllamaChatCompletionRequest,
+    OllamaModelInfoRequest,
 )
 from quack_norris.common.quack_norris import QuackNorris
 
@@ -190,3 +193,19 @@ def models():
     if DEBUG:
         print(f"RESPONSE: {json.dumps(response)}")
     return response
+
+
+@app.post("/api/show")
+def show_model_information(request: OllamaModelInfoRequest):
+    # TODO actually forward info from ollama where available and use config file for openai endpoint
+    return {"capabilities": ["completion", "vision", "tools", "insert"]}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
+    # or logger.error(f'{exc}')
+    print(await request.json())
+    print(exc_str)
+    content = {"status_code": 10422, "message": exc_str, "data": None}
+    return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
