@@ -82,7 +82,7 @@ export class Chat extends Module<HTMLDivElement> {
     }
 
     public async getModels(): Promise<string[]> {
-        const response = await fetch(this.apiEndpoint + "/api/tags", {
+        const response = await fetch(this.apiEndpoint + "/models", {
             method: 'GET',
             headers: {
                 Authorization: `Bearer ${this.apiKey}`,
@@ -91,8 +91,8 @@ export class Chat extends Module<HTMLDivElement> {
         })
         let data = await response.json()
         let models = []
-        for (let model of data["models"]) {
-            models.push(model["name"])
+        for (let model of data["data"]) {
+            models.push(model["id"])
         }
         return models
     }
