@@ -93,3 +93,18 @@
 .chat-history .action:hover {
   fill: var(--color-base-c);
 }
+
+.chat-history .message-body .thought {
+  max-width: 100%;
+  overflow: auto;
+  background-color: var(--color-subtle-gray);
+  border-radius: var(--radius);
+  padding: 0.75em;
+  box-shadow: 0 0 6px var(--color-shadow-color);
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.chat-history .message-body .thought-header {
+  font-weight: bold;
+}

@@ -3,7 +3,7 @@ import "../webui/md.css"
 import { Module } from "../webui/module";
 import * as marked from 'marked';
 import { ActionButton } from "../webui/components/buttons";
-import { iconCopy, iconEdit, iconRefresh, iconTrash } from "../icons";
+import { iconAIModel, iconCopy, iconEdit, iconRefresh, iconTrash } from "../icons";
 import { Chat } from "./chat";
 import { copyToClipboard } from "../webui/utils/copy";
 import { ConfirmCancelPopup } from "../webui/components/popup";
@@ -44,6 +44,25 @@ export class EditBar extends Module<HTMLDivElement> {
     }
 }
 
+class Thought extends Module<HTMLDivElement> {
+    public constructor(text: string) {
+        super("div", "", "thought")
+        var header = new Module<HTMLDivElement>("div", iconAIModel + " Thought (click to expand/collapse)", "thought-header")
+        this.add(header)
+        var content = new Module<HTMLDivElement>("div", text)
+        content.hide()
+        this.add(content)
+
+        this.htmlElement.onclick = () => {
+            if (content.isVisible()) {
+                content.hide()
+            } else {
+                content.show()
+            }
+        }
+    }
+}
+
 export class ChatMessage extends Module<HTMLDivElement> {
     private content: Module<HTMLDivElement>
     private modelDiv: Module<HTMLDivElement>
@@ -63,15 +82,27 @@ export class ChatMessage extends Module<HTMLDivElement> {
         } else {
             this.add(new EditBar(history, this, false))
         }
-        let html = marked.parse(md_content) as string
-        this.content = new Module<HTMLDivElement>("div", html, "message-body")
+        this.content = new Module<HTMLDivElement>("div", "", "message-body")
         this.add(this.content)
+        this.md_content = ""
+        this.appendText(md_content)
     }
 
     public appendText(text: string) {
         this.md_content += text
-        let html = marked.parse(this.md_content) as string
-        this.content.htmlElement.innerHTML = html
+        this.content.htmlElement.innerHTML = ""
+
+        let parts = this.md_content.split("</think>")
+        for (let part of parts) {
+            part = part.trim()
+            if (part.startsWith("<think>")) {
+                let html = marked.parse(part.replace("<think>", "")) as string
+                this.content.add(new Thought(html))
+            } else {
+                let html = marked.parse(part) as string
+                this.content.add(new Module<HTMLDivElement>("div", html))
+            }
+        }
     }
 
     public getText(): string {
