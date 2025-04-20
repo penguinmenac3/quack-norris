@@ -11,8 +11,6 @@ from starlette.responses import StreamingResponse
 from quack_norris.common._types import (
     ChatMessage,
     ChatCompletionRequest,
-    OllamaChatCompletionRequest,
-    OllamaModelInfoRequest,
 )
 from quack_norris.common.quack_norris import QuackNorris
 
@@ -79,7 +77,7 @@ app.add_middleware(
 #     }
 
 
-def _wrap_openai_chat_generator(stream, model):
+def _wrap_chat_generator(stream, model):
     for i, token in enumerate(stream):
         chunk = {
             "id": i,
@@ -97,7 +95,7 @@ def _wrap_openai_chat_generator(stream, model):
 
 
 @app.post("/chat/completions")
-def openai_chat_completions(request: ChatCompletionRequest):
+def chat_completions(request: ChatCompletionRequest):
     if DEBUG:
         print(f"REQUEST: {request}")
     reason = "stop"
@@ -110,95 +108,46 @@ def openai_chat_completions(request: ChatCompletionRequest):
         if isinstance(response, str):
             response = [response]
         return StreamingResponse(
-            _wrap_openai_chat_generator(response, request.model), media_type="text/event-stream"
+            _wrap_chat_generator(response, request.model),
+            media_type="text/event-stream",
         )
-    response = {
+    if not isinstance(response, str):
+        response = "".join(response)
+    response_obj = {
         "id": str(uuid4()),
         "object": "chat.completion",
         "model": request.model,
         "created": int(time()),
         "choices": [
-            {"finish_reason": reason, "message": ChatMessage(role="assistant", content=response)}
+            {
+                "finish_reason": reason,
+                "message": ChatMessage(role="assistant", content=response),
+            }
         ],
     }
     if DEBUG:
-        print(f"RESPONSE: {json.dumps(response)}")
-    return response
+        print(f"RESPONSE: {json.dumps(response_obj)}")
+    return response_obj
 
 
-def _wrap_ollama_chat_generator(stream, model):
-    for token in stream:
-        chunk = {
-            "model": model,
-            "created": str(time()),
-            "message": {
-                "role": "assistant",
-                "content": token,
-                "images": None,
-            },
-            "done": False,
-        }
-        if DEBUG:
-            print(f"{json.dumps(chunk)}")
-        yield f"{json.dumps(chunk)}\n"
-    final_chunk = {
-        "model": model,
-        "created": str(time()),
-        "message": {
-            "role": "assistant",
-            "content": "",
-            "images": None,
-        },
-        "done": True,
-        "done_reason": "stop",
-    }
-    if DEBUG:
-        print(f"{json.dumps(final_chunk)}")
-    yield f"{json.dumps(final_chunk)}\n"
-
-
-@app.post("/api/chat")
-def ollam_chat_completions(request: OllamaChatCompletionRequest):
-    if DEBUG:
-        print(f"REQUEST: {request}")
-    reason = "stop"
-    try:
-        response = quack.chat(request)
-    except RuntimeError as e:
-        response = str(e)
-        reason = "error"
-    if request.stream:
-        if isinstance(response, str):
-            response = [response]
-        return StreamingResponse(
-            _wrap_ollama_chat_generator(response, request.model),
-            media_type="application/x-ndjson",
-            headers={"Transfer-Encoding": "chunked"},
-        )
+@app.get("/models")
+def openai_models():
     response = {
-        "model": request.model,
-        "created_at": str(time()),
-        "message": {"role": "assistant", "content": response},
-        "done": True,
-        "done_reason": reason,
+        "object": "list",
+        "data": [
+            {
+                "id": model,
+                "object": "model",
+                "created": time(),
+                "owned_by": "quack-norris",
+            }
+            for model in quack.get_models()
+        ],
+        "object": "list",
     }
     if DEBUG:
         print(f"RESPONSE: {json.dumps(response)}")
     return response
-
-
-@app.get("/api/tags")
-def models():
-    response = {"models": [{"name": model, "details": {}} for model in quack.get_models()]}
-    if DEBUG:
-        print(f"RESPONSE: {json.dumps(response)}")
-    return response
-
-
-@app.post("/api/show")
-def show_model_information(request: OllamaModelInfoRequest):
-    # TODO actually forward info from ollama where available and use config file for openai endpoint
-    return {"capabilities": ["completion", "vision", "tools", "insert"]}
 
 
 @app.exception_handler(RequestValidationError)

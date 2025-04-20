@@ -1,6 +1,6 @@
 from typing import Generator, NamedTuple, Callable
 
-from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest
+from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest, ChatContent
 from quack_norris.common.config import read_config
 from quack_norris.common.llm_provider import LLM, LLMMultiplexer
 
@@ -33,7 +33,7 @@ class QuackNorris(LLM):
             request.model = self._default_model
         if request.model.startswith("quack-norris/"):
             request.model = request.model.replace("quack-norris/", "")
-        msg = request.messages[-1].content
+        msg = request.messages[-1].text()
         command = self._detect_command(msg)
         if command is not None:
             request.model = "command"
@@ -43,7 +43,7 @@ class QuackNorris(LLM):
             messages = []
             last_command = False
             for msg in request.messages:
-                if self._detect_command(msg.content) is not None:
+                if self._detect_command(msg.text()) is not None:
                     last_command = True
                     continue
                 if not last_command:
