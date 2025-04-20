@@ -81,6 +81,22 @@ export class Chat extends Module<HTMLDivElement> {
         this.chatHistory.saveMessages()
     }
 
+    public async getModels(): Promise<string[]> {
+        const response = await fetch(this.apiEndpoint + "/api/tags", {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json',
+            },
+        })
+        let data = await response.json()
+        let models = []
+        for (let model of data["models"]) {
+            models.push(model["name"])
+        }
+        return models
+    }
+
     public newConversation() {
         this.chatHistory.clear()
     }

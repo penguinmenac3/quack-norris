@@ -22,6 +22,15 @@ export class ChatInput extends Module<HTMLDivElement> {
         toolbar.add(addMedia)
         let settings = new Module<HTMLSpanElement>("span", "", "settings")
         this.llm = new DropdownButton("")
+        this.llm.onAction = async () => {
+            let chat = this.parent! as Chat
+            let models = await chat.getModels()
+            let actions = new Map<string, CallableFunction>()
+            for (let model of models) {
+                actions.set(model, () => { this.setModel(model); return true })
+            }
+            this.llm.showMenu(actions)
+        }
         this.setModel(this.model)
         settings.add(this.llm)
         let role = new DropdownButton(iconRoles + " General " + iconDropdown)
