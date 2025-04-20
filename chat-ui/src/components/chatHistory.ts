@@ -69,7 +69,7 @@ export class ChatMessage extends Module<HTMLDivElement> {
     private content: Module<HTMLDivElement>
     private modelDiv: Module<HTMLDivElement>
 
-    public constructor(history: ChatHistory, private md_content: string, private model: string = "") {
+    public constructor(history: ChatHistory, private md_content: string, private images: string[], private model: string = "") {
         super("div", "", "message-container")
         this.modelDiv = new Module<HTMLDivElement>("div", model, "model")
         this.add(this.modelDiv)
@@ -112,6 +112,10 @@ export class ChatMessage extends Module<HTMLDivElement> {
         return this.md_content
     }
 
+    public getImages(): string[] {
+        return this.images
+    }
+
     public setModel(model: string) {
         this.model = model
         this.modelDiv.htmlElement.innerText = model
@@ -136,10 +140,10 @@ export class ChatHistory extends Module<HTMLDivElement> {
     public constructor(debug: boolean = false) {
         super("div", "", "chat-history")
         if (debug) {
-            this.addMessage("How can I help you today?", "Quack-Norris")
-            this.addMessage("What is 2+2?")
-            this.addMessage("2 + 2 = 4", "Quack-Norris")
-            this.addMessage("Are you sure, can you explain me why?")
+            this.addMessage("How can I help you today?", [], "Quack-Norris")
+            this.addMessage("What is 2+2?", [])
+            this.addMessage("2 + 2 = 4", [], "Quack-Norris")
+            this.addMessage("Are you sure, can you explain me why?", [])
         let md = `You're right to question! It's good to be curious. Let's break down why 2 + 2 = 4.
 
 * **What does "plus" mean?** "Plus" (the + symbol) means we're combining things together.
@@ -163,15 +167,15 @@ Therefore, 2 + 2 = 4.
 
 
 Do you want me to explain it another way, or maybe use a different example?`
-            this.addMessage(md, "Quack-Norris")
+            this.addMessage(md, [], "Quack-Norris")
         } else {
             this.loadMessages()
         }
     }
 
-    public addMessage(message: string, model: string = "", save: boolean = true) {
+    public addMessage(message: string, images: string[], model: string = "", save: boolean = true) {
         // Add the chat message and give it time to appear
-        let chatMessage = new ChatMessage(this, message, model)
+        let chatMessage = new ChatMessage(this, message, images, model)
         this.chatMessages.push(chatMessage)
         this.add(chatMessage)
         setTimeout(() => {
@@ -191,7 +195,7 @@ Do you want me to explain it another way, or maybe use a different example?`
     public saveMessages() {
         let messages = []
         for (let message of this.chatMessages) {
-            messages.push({ "text": message.getText(), "model": message.getModel() })
+            messages.push({ "text": message.getText(), "images": message.getImages(), "model": message.getModel() })
         }
         localStorage.setItem("quack-history", JSON.stringify(messages))
     }
@@ -201,7 +205,7 @@ Do you want me to explain it another way, or maybe use a different example?`
         this.htmlElement.innerHTML = ""
         this.chatMessages = []
         for (let message of messages) {
-            this.addMessage(message["text"], message["model"], false)
+            this.addMessage(message["text"], message["images"], message["model"], false)
         }
     }
 
@@ -234,10 +238,11 @@ Do you want me to explain it another way, or maybe use a different example?`
         let pos = this.chatMessages.indexOf(chatMessage) - 1
         if (pos >= 0) {
             let text = this.chatMessages[pos].getText()
+            let images = this.chatMessages[pos].getImages()
             this.chatMessages = this.chatMessages.splice(0, pos)
             this.saveMessages()
             this.loadMessages()
-            chat.sendMessage(text, model)
+            chat.sendMessage(text, images, model)
         } else {
             alert("Failed to rerun message, cannot find user request.")
         }

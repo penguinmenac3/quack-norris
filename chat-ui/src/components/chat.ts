@@ -28,17 +28,27 @@ export class Chat extends Module<HTMLDivElement> {
         window.location.hash = "chat"
     }
 
-    public async sendMessage(message: string, model: string) {
-        this.chatHistory.addMessage(message)
+    public async sendMessage(message: string, images: string[], model: string) {
+        this.chatHistory.addMessage(message, images)
         let messages = []
         for (let message of this.chatHistory.getMessages()) {
+            let content: any[] = [{
+                "type": "text",
+                "text": message.getText()
+            }]
+            for (let image of message.getImages()) {
+                content.push({
+                    "type": "image_url",
+                    "image_url": { "url": image }
+                })
+            }
             messages.push({
                 "role": message.getRole(),
-                "content": message.getText()
+                "content": content
             })
         }
         // Create an empty message (that is not saved)
-        let chatMessage = this.chatHistory.addMessage("", model, false)
+        let chatMessage = this.chatHistory.addMessage("", [], model, false)
 
         // Stream in the result into the message entity
         const response = await fetch(this.apiEndpoint + "/chat/completions", {

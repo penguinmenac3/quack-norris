@@ -64,8 +64,9 @@ export class ChatInput extends Module<HTMLDivElement> {
 
         this.send.onAction = () => {
             let text = this.input.htmlElement.value
+            let images: string[] = []
             let chat = this.parent! as Chat
-            chat.sendMessage(text, this.model)
+            chat.sendMessage(text, images, this.model)
             this.input.htmlElement.value = ""
             this.onUpdateInput()
         }
