@@ -11,10 +11,10 @@ import { ConfirmCancelPopup } from "../webui/components/popup";
 export class EditBar extends Module<HTMLDivElement> {
     public constructor(history: ChatHistory, message: ChatMessage, isModel: boolean) {
         super("div", "", "message-tool-bar")
+        this.add(new ActionButton(iconCopy, () => {
+            copyToClipboard(message.getText().trim())
+        }))
         if (isModel) {
-            this.add(new ActionButton(iconCopy, () => {
-                copyToClipboard(message.getText().trim())
-            }))
             this.add(new ActionButton(iconRefresh, () => {
                 let popup = new ConfirmCancelPopup("Are you sure? (This will delete the message and all newer messages!)", "Yes", "Cancel")
                 popup.onConfirm = () => {
