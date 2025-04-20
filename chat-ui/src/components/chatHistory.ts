@@ -45,12 +45,14 @@ export class EditBar extends Module<HTMLDivElement> {
 }
 
 class Thought extends Module<HTMLDivElement> {
-    public constructor(text: string) {
+    public constructor(text: string, show: boolean) {
         super("div", "", "thought")
         var header = new Module<HTMLDivElement>("div", iconAIModel + " Thought (click to expand/collapse)", "thought-header")
         this.add(header)
         var content = new Module<HTMLDivElement>("div", text)
-        content.hide()
+        if (!show) {
+            content.hide()
+        }
         this.add(content)
 
         this.htmlElement.onclick = () => {
@@ -93,11 +95,12 @@ export class ChatMessage extends Module<HTMLDivElement> {
         this.content.htmlElement.innerHTML = ""
 
         let parts = this.md_content.split("</think>")
-        for (let part of parts) {
-            part = part.trim()
+        for (let idx of parts.keys()) {
+            let part = parts[idx].trim()
             if (part.startsWith("<think>")) {
                 let html = marked.parse(part.replace("<think>", "")) as string
-                this.content.add(new Thought(html))
+                let show = idx == parts.length - 1
+                this.content.add(new Thought(html, show))
             } else {
                 let html = marked.parse(part) as string
                 this.content.add(new Module<HTMLDivElement>("div", html))
