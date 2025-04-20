@@ -2,13 +2,36 @@ import "./chat.css"
 import { KWARGS, Module } from "../webui/module";
 import { ChatInput } from "./chatInput";
 import { ChatHistory } from "./chatHistory";
+import { ActionButton, DropdownButton } from "../webui/components/buttons";
+import { iconAIModel, iconDropdown } from "../icons";
+import { iconBars } from "../webui/icons";
 
 export class Chat extends Module<HTMLDivElement> {
     public chatHistory: ChatHistory
     public chatInput: ChatInput
+    private llm: DropdownButton
+    private model: string = "quack-norris"
     
     public constructor(private apiEndpoint: string, private apiKey: string) {
         super("div", "", "chat")
+        let header = new Module<HTMLDivElement>("div", "", "chat-header")
+        let conversations = new ActionButton(iconBars)
+        header.add(conversations)
+        this.llm = new DropdownButton(iconAIModel + " " + this.model + " " + iconDropdown)
+        this.llm.onAction = async () => {
+            let models = await this.getModels()
+            let actions = new Map<string, CallableFunction>()
+            for (let model of models) {
+                actions.set(model, () => {
+                    this.model = model
+                    this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
+                    return true
+                })
+            }
+            this.llm.showMenu(actions)
+        }
+        header.add(this.llm)
+        this.add(header)
         this.chatHistory = new ChatHistory()
         this.add(this.chatHistory)
         this.chatInput = new ChatInput()
@@ -23,12 +46,12 @@ export class Chat extends Module<HTMLDivElement> {
             this.apiKey = kwargs.apiKey
         }
         if (kwargs.model) {
-            this.chatInput.setModel(kwargs.model)
+            this.model = kwargs.model
         }
         window.location.hash = "chat"
     }
 
-    public async sendMessage(message: string, images: string[], model: string) {
+    public async sendMessage(message: string, images: string[]) {
         this.chatHistory.addMessage(message, images)
         let messages = []
         for (let message of this.chatHistory.getMessages()) {
@@ -48,7 +71,7 @@ export class Chat extends Module<HTMLDivElement> {
             })
         }
         // Create an empty message (that is not saved)
-        let chatMessage = this.chatHistory.addMessage("", [], model, false)
+        let chatMessage = this.chatHistory.addMessage("", [], this.model, false)
 
         // Stream in the result into the message entity
         const response = await fetch(this.apiEndpoint + "/chat/completions", {
@@ -58,7 +81,7 @@ export class Chat extends Module<HTMLDivElement> {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: model,
+                model: this.model,
                 messages: messages,
                 stream: true,
             }),

@@ -234,7 +234,6 @@ Do you want me to explain it another way, or maybe use a different example?`
 
     public rerunMessage(chatMessage: ChatMessage) {
         let chat = this.parent! as Chat
-        let model = chat.chatInput.getModel()
         let pos = this.chatMessages.indexOf(chatMessage) - 1
         if (pos >= 0) {
             let text = this.chatMessages[pos].getText()
@@ -242,7 +241,7 @@ Do you want me to explain it another way, or maybe use a different example?`
             this.chatMessages = this.chatMessages.splice(0, pos)
             this.saveMessages()
             this.loadMessages()
-            chat.sendMessage(text, images, model)
+            chat.sendMessage(text, images)
         } else {
             alert("Failed to rerun message, cannot find user request.")
         }

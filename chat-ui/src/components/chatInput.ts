@@ -1,16 +1,14 @@
 import "./chatInput.css"
-import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool, iconRoles, iconAIModel } from "../icons";
+import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool, iconAIModel } from "../icons";
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
 import { DropdownButton, ActionButton } from "../webui/components/buttons";
 import { ConfirmCancelPopup } from "../webui/components/popup";
 
 export class ChatInput extends Module<HTMLDivElement> {
-    private model: string = "quack-norris"
     private input: Module<HTMLTextAreaElement>
     private send: ActionButton
     private call: ActionButton
-    private llm: DropdownButton
 
     public constructor() {
         super("div", "", "chat-input");
@@ -21,20 +19,11 @@ export class ChatInput extends Module<HTMLDivElement> {
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
         let settings = new Module<HTMLSpanElement>("span", "", "settings")
-        this.llm = new DropdownButton("")
-        this.llm.onAction = async () => {
-            let chat = this.parent! as Chat
-            let models = await chat.getModels()
-            let actions = new Map<string, CallableFunction>()
-            for (let model of models) {
-                actions.set(model, () => { this.setModel(model); return true })
-            }
-            this.llm.showMenu(actions)
-        }
-        this.setModel(this.model)
-        settings.add(this.llm)
-        let role = new DropdownButton(iconRoles + " General " + iconDropdown)
-        settings.add(role)
+        //let role = new DropdownButton(iconRoles + " General " + iconDropdown)
+        //let roles = new Map<string, CallableFunction>()
+        //roles.set("General", () => true)  // FIXME add roles like with LLM, but for now do nothing
+        //role.setOptions(roles)
+        //settings.add(role)
         let tools = new DropdownButton(iconTool + " Tools " + iconDropdown)
         settings.add(tools)
         toolbar.add(settings)
@@ -66,7 +55,7 @@ export class ChatInput extends Module<HTMLDivElement> {
             let text = this.input.htmlElement.value
             let images: string[] = []
             let chat = this.parent! as Chat
-            chat.sendMessage(text, images, this.model)
+            chat.sendMessage(text, images)
             this.input.htmlElement.value = ""
             this.onUpdateInput()
         }
@@ -97,15 +86,6 @@ export class ChatInput extends Module<HTMLDivElement> {
             height = window.innerHeight * 0.4
         }
         this.input.htmlElement.style.height = "" + height + "px"
-    }
-
-    public setModel(model: string) {
-        this.model = model
-        this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
-    }
-
-    public getModel(): string {
-        return this.model
     }
 
     public setInputText(text: string) {

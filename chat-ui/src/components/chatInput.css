@@ -37,7 +37,7 @@
     display: flex;
 }
 
-.chat-input .dropdown {
+.chat .dropdown {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -48,19 +48,19 @@
     border-radius: var(--radius-round);
 }
 
-.chat-input .dropdown svg:first-child {
+.chat .dropdown svg:first-child {
     padding-right: 0.5em;
 }
 
-.chat-input .dropdown svg:last-child {
+.chat .dropdown svg:last-child {
     padding-left: 0.5em;
 }
 
-.chat-input .dropdown:hover {
+.chat .dropdown:hover {
     background-color: var(--color-contrast-gray);
 }
 
-.chat-input .action {
+.chat .action {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -70,6 +70,6 @@
     border-radius: var(--radius-round);
 }
 
-.chat-input .action:hover {
+.chat .action:hover {
     background-color: var(--color-contrast-gray);
 }
