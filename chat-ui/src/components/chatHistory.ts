@@ -1,4 +1,5 @@
 import "./chatHistory.css"
+import "../webui/md.css"
 import { Module } from "../webui/module";
 import * as marked from 'marked';
 import { ActionButton } from "../webui/components/buttons";
