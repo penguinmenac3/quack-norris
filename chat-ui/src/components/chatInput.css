@@ -70,6 +70,16 @@
     border-radius: var(--radius-round);
 }
 
+.chat .with-text {
+    width: auto;
+    padding-left: 0.75em;
+    padding-right: 0.75em;
+}
+
+.chat .with-text svg:first-child {
+    padding-right: 0.5em;
+}
+
 .chat .action:hover {
     background-color: var(--color-contrast-gray);
 }

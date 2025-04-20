@@ -31,6 +31,11 @@ export class Chat extends Module<HTMLDivElement> {
             this.llm.showMenu(actions)
         }
         header.add(this.llm)
+        //let role = new DropdownButton(iconRoles + " General " + iconDropdown)
+        // let roles = new Map<string, CallableFunction>()
+        // roles.set("General", () => true)  // FIXME add roles like with LLM, but for now do nothing
+        // role.setOptions(roles)
+        // header.add(role)
         this.add(header)
         this.chatHistory = new ChatHistory()
         this.add(this.chatHistory)

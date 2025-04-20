@@ -1,5 +1,5 @@
 import "./chatInput.css"
-import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool, iconAIModel } from "../icons";
+import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool, iconWeb, iconBook } from "../icons";
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
 import { DropdownButton, ActionButton } from "../webui/components/buttons";
@@ -19,12 +19,19 @@ export class ChatInput extends Module<HTMLDivElement> {
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
         let settings = new Module<HTMLSpanElement>("span", "", "settings")
-        //let role = new DropdownButton(iconRoles + " General " + iconDropdown)
-        //let roles = new Map<string, CallableFunction>()
-        //roles.set("General", () => true)  // FIXME add roles like with LLM, but for now do nothing
-        //role.setOptions(roles)
-        //settings.add(role)
-        let tools = new DropdownButton(iconTool + " Tools " + iconDropdown)
+        let web_search = new ActionButton(iconWeb + " WebSearch")
+        web_search.setClass("with-text")
+        settings.add(web_search)
+        //let code = new ActionButton(iconTerminal + " Code")
+        //code.setClass("with-text")
+        //settings.add(code)
+        let rag = new ActionButton(iconBook + " RaG")
+        rag.setClass("with-text")
+        settings.add(rag)
+        let tools = new DropdownButton(iconTool + " MCP Tools " + iconDropdown)
+        let tool_mapping = new Map<string, CallableFunction>()
+        tool_mapping.set("Not implemented yet!", () => true)
+        tools.setOptions(tool_mapping)
         settings.add(tools)
         toolbar.add(settings)
         let newConversation = new ActionButton(iconTrash)
