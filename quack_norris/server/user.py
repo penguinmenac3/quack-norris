@@ -35,7 +35,6 @@ def get_users() -> dict[str, User]:
 
 
 def update_user(user: User, **kwargs):
-    global _users
     assert _users is not None
     _users[user.api_key] = user._replace(**kwargs)
     write_config(USER_CONFIG_NAME, list(_users.values()))
