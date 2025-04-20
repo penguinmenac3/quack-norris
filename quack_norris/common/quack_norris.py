@@ -1,6 +1,6 @@
 from typing import Generator, NamedTuple, Callable
 
-from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest, ChatContent
+from quack_norris.common._types import ChatCompletionRequest, EmbeddingRequest
 from quack_norris.common.config import read_config
 from quack_norris.common.llm_provider import LLM, LLMMultiplexer
 
