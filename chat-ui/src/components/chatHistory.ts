@@ -1,14 +1,44 @@
 import "./chatHistory.css"
 import { Module } from "../webui/module";
 import * as marked from 'marked';
+import { ActionButton } from "../webui/components/buttons";
+import { iconCopy, iconEdit, iconRefresh, iconTrash } from "../icons";
+import { Chat } from "./chat";
+import { copyToClipboard } from "../webui/utils/copy";
+import { ConfirmCancelPopup } from "../webui/components/popup";
 
 export class EditBar extends Module<HTMLDivElement> {
-    public constructor(isModel: boolean) {
-        super("div", "", "edit-bar")
+    public constructor(history: ChatHistory, message: ChatMessage, isModel: boolean) {
+        super("div", "", "message-tool-bar")
         if (isModel) {
-            this.htmlElement.innerHTML = "" //"TODO (Model Edit)"
+            this.add(new ActionButton(iconCopy, () => {
+                copyToClipboard(message.getText().trim())
+            }))
+            this.add(new ActionButton(iconRefresh, () => {
+                let popup = new ConfirmCancelPopup("Are you sure? (This will delete the message and all newer messages!)", "Yes", "Cancel")
+                popup.onConfirm = () => {
+                    history.rerunMessage(message)
+                }
+                popup.onCancel = () => { }
+            }))
         } else {
-            this.htmlElement.innerHTML = "" //"TODO (User Edit)"
+            this.add(new ActionButton(iconEdit, () => {
+                let popup = new ConfirmCancelPopup("Are you sure? (This will delete the message and all newer messages!)", "Yes", "Cancel")
+                popup.onConfirm = () => {
+                    let text = message.getText()
+                    history.deleteMessagesAfter(message)
+                    let chat = history.parent! as Chat
+                    chat.chatInput.setInputText(text)
+                }
+                popup.onCancel = () => { }
+            }))
+            this.add(new ActionButton(iconTrash, () => {
+                let popup = new ConfirmCancelPopup("Are you sure? (This will delete the message and its answer!)", "Yes", "Cancel")
+                popup.onConfirm = () => {
+                    history.deleteMessage(message)
+                }
+                popup.onCancel = () => { }
+            }))
         }
     }
 }
@@ -17,7 +47,7 @@ export class ChatMessage extends Module<HTMLDivElement> {
     private content: Module<HTMLDivElement>
     private modelDiv: Module<HTMLDivElement>
 
-    public constructor(private md_content: string, private model: string = "") {
+    public constructor(history: ChatHistory, private md_content: string, private model: string = "") {
         super("div", "", "message-container")
         this.modelDiv = new Module<HTMLDivElement>("div", model, "model")
         this.add(this.modelDiv)
@@ -27,14 +57,14 @@ export class ChatMessage extends Module<HTMLDivElement> {
         } else {
             this.setClass("from-model")
         }
+        if (model != "") {
+            this.add(new EditBar(history, this, true))
+        } else {
+            this.add(new EditBar(history, this, false))
+        }
         let html = marked.parse(md_content) as string
         this.content = new Module<HTMLDivElement>("div", html, "message-body")
         this.add(this.content)
-        if (model != "") {
-            this.add(new EditBar(true))
-        } else {
-            this.add(new EditBar(false))
-        }
     }
 
     public appendText(text: string) {
@@ -106,7 +136,7 @@ Do you want me to explain it another way, or maybe use a different example?`
 
     public addMessage(message: string, model: string = "", save: boolean = true) {
         // Add the chat message and give it time to appear
-        let chatMessage = new ChatMessage(message, model)
+        let chatMessage = new ChatMessage(this, message, model)
         this.chatMessages.push(chatMessage)
         this.add(chatMessage)
         setTimeout(() => {
@@ -143,5 +173,38 @@ Do you want me to explain it another way, or maybe use a different example?`
     public clear() {
         localStorage.setItem("quack-history", JSON.stringify([]))
         this.loadMessages()
+    }
+
+    public deleteMessagesAfter(chatMessage: ChatMessage) {
+        let pos = this.chatMessages.indexOf(chatMessage)
+        if (pos >= 0) {
+            this.chatMessages = this.chatMessages.splice(0, pos)
+            this.saveMessages()
+            this.loadMessages()
+        }
+    }
+
+    public deleteMessage(chatMessage: ChatMessage) {
+        let pos = this.chatMessages.indexOf(chatMessage)
+        if (pos >= 0) {
+            this.chatMessages = this.chatMessages.splice(0, pos).concat(this.chatMessages.splice(pos + 2))
+            this.saveMessages()
+            this.loadMessages()
+        }
+    }
+
+    public rerunMessage(chatMessage: ChatMessage) {
+        let chat = this.parent! as Chat
+        let model = chat.chatInput.getModel()
+        let pos = this.chatMessages.indexOf(chatMessage) - 1
+        if (pos >= 0) {
+            let text = this.chatMessages[pos].getText()
+            this.chatMessages = this.chatMessages.splice(0, pos)
+            this.saveMessages()
+            this.loadMessages()
+            chat.sendMessage(text, model)
+        } else {
+            alert("Failed to rerun message, cannot find user request.")
+        }
     }
 }

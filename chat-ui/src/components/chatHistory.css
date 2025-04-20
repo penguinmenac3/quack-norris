@@ -1,53 +1,94 @@
-
 .chat-history {
-    width: 100%;
-    height: 100%;
-    overflow-y: scroll;
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
 }
 
 .chat-history .message-container {
-    margin-top: 0.5em;
-    margin-left: 1em;
-    margin-right: 1em;
-    margin-bottom: 0.5em;
-    padding: 0.75em;
-    border-radius: var(--radius);
-    clear: both;
-    width: fit-content;
-    box-shadow: 0 1px 3px var(--color-shadow-color);
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  clear: both;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .chat-history .from-model {
-    text-align: left;
-    margin-bottom: 0.5em;
-    margin-right: 3em;
-    background-color: var(--color-base-1);
+  text-align: left;
+  margin-bottom: 0.5em;
 }
 
 .chat-history .from-user {
-    float: right;
-    text-align: left;
-    margin-left: 3em;
-    margin-bottom: 0.5em;
-    background-color: var(--color-base-2);
+  float: right;
+  text-align: left;
+  margin-left: 3em;
+  margin-bottom: 0.5em;
 }
 
 .chat-history .message-body {
-    font-size: 1em;
-    line-height: 1.4;
-    word-wrap: break-word;
+  padding: 1em;
+  margin-left: 1em;
+  margin-right: 1em;
+  padding: 0.75em;
+  border-radius: var(--radius);
+  font-size: 1em;
+  line-height: 1.4;
+  word-wrap: break-word;
 }
 
+.chat-history .from-user .message-body {
+  background-color: var(--color-base-2);
+  box-shadow: 0 1px 3px var(--color-shadow-color);
+}
 .chat-history .message-body p:first-child {
-    margin-block-start: 0;
+  margin-block-start: 0;
 }
 
 .chat-history .message-body p:last-child {
-    margin-block-end: 0;
+  margin-block-end: 0;
+}
+
+.chat-history .message-body pre {
+  overflow-y: auto;
+  display: block;
+  width: 100%;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px var(--color-shadow-color);
 }
 
 .chat-history .model {
-    font-size: smaller;
-    color: var(--color-contrast-gray);
-    margin-bottom: 5px;
+  display: inline-block;
+  margin-left: 2em;
+  margin-right: 1em;
+  font-size: smaller;
+  color: var(--color-contrast-gray);
+}
+
+.chat-history .message-tool-bar {
+  display: inline-block;
+  color: var(--color-base);
+  fill: var(--color-base);
+}
+
+.chat-history .message-container:hover .message-tool-bar {
+  color: var(--color-base-c);
+  fill: var(--color-contrast-gray);
+}
+
+.chat-history .from-user .message-tool-bar {
+    display: block;
+    text-align: right;
+    margin-right: 0.75em;
+}
+
+.chat-history .action {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  width: 1.8em;
+  height: 1.8em;
+}
+
+.chat-history .action:hover {
+  fill: var(--color-base-c);
 }

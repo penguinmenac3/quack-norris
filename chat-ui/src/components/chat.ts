@@ -4,8 +4,8 @@ import { ChatInput } from "./chatInput";
 import { ChatHistory } from "./chatHistory";
 
 export class Chat extends Module<HTMLDivElement> {
-    private chatHistory: ChatHistory
-    private chatInput: ChatInput
+    public chatHistory: ChatHistory
+    public chatInput: ChatInput
     
     public constructor(private apiEndpoint: string, private apiKey: string) {
         super("div", "", "chat")
