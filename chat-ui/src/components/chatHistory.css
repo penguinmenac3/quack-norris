@@ -24,6 +24,12 @@
   margin-bottom: 0.5em;
 }
 
+.chat-history .message-container img {
+  margin-left: 1em;
+  width: 5em;
+  height: 5em;
+}
+
 .chat-history .message-body {
   padding: 1em;
   margin-left: 1em;

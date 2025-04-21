@@ -84,6 +84,11 @@ export class ChatMessage extends Module<HTMLDivElement> {
         } else {
             this.add(new EditBar(history, this, false))
         }
+        for (let image of images) {
+            let img = new Module<HTMLImageElement>("img")
+            img.htmlElement.src = image
+            this.add(img)
+        }
         this.content = new Module<HTMLDivElement>("div", "", "message-body")
         this.add(this.content)
         this.md_content = ""

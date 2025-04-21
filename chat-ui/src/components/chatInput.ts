@@ -12,8 +12,12 @@ export class ChatInput extends Module<HTMLDivElement> {
     public constructor() {
         super("div", "", "chat-input");
         let container = new Module<HTMLDivElement>("div", "", "container")
+        let media = new Module<HTMLDivElement>("div", "", "media")
+        media.hide()
+        container.add(media)
         this.input = new Module<HTMLTextAreaElement>("textarea")
         this.input.htmlElement.placeholder = "Why is the sky blue?"
+        container.add(this.input)
         let toolbar = new Module<HTMLDivElement>("div", "", "tool-bar")
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
@@ -38,7 +42,6 @@ export class ChatInput extends Module<HTMLDivElement> {
         this.send = new ActionButton(iconSend)
         this.send.hide()
         toolbar.add(this.send)
-        container.add(this.input)
         container.add(toolbar)
         this.add(container)
 
@@ -57,9 +60,44 @@ export class ChatInput extends Module<HTMLDivElement> {
             let text = this.input.htmlElement.value
             let images: string[] = []
             let chat = this.parent! as Chat
+            for (let module of media.getChildren()) {
+                let image = module as Image
+                images.push(image.getImageURL())
+            }
+            media.removeChildren()
+            media.hide()
             chat.sendMessage(text, images)
             this.input.htmlElement.value = ""
             this.onUpdateInput()
+        }
+
+        this.input.htmlElement.addEventListener('paste', async (e) => {
+            const clipboardItems = typeof navigator?.clipboard?.read === 'function' ? await navigator.clipboard.read() : e.clipboardData!.files
+
+            for (const clipboardItem of clipboardItems) {
+                if ((clipboardItem instanceof File) && (clipboardItem.type?.startsWith('image/'))) {
+                    appendImage(clipboardItem)
+                    e.preventDefault()
+                } else if (clipboardItem instanceof ClipboardItem) {
+                    // For files from `navigator.clipboard.read()`.
+                    const imageTypes = clipboardItem.types?.filter((type: string) => type.startsWith('image/'))
+                    for (const imageType of imageTypes) {
+                        // Do something with the blob.
+                        appendImage(await clipboardItem.getType(imageType))
+                        e.preventDefault()
+                    }
+                }
+            }
+        })
+
+        const appendImage = (blob: Blob) => {
+            var reader = new FileReader()
+            reader.readAsDataURL(blob)
+            reader.onloadend = function () {
+                var base64data = "" + reader.result
+                media.add(new Image(base64data))
+                media.show()
+            }
         }
     }
 
@@ -84,5 +122,17 @@ export class ChatInput extends Module<HTMLDivElement> {
     public setInputText(text: string) {
         this.input.htmlElement.value = text
         this.onUpdateInput()
+    }
+}
+
+
+class Image extends Module<HTMLImageElement> {
+    public constructor(private base64data: string) {
+        super("img", "")
+        this.htmlElement.src = base64data
+    }
+
+    public getImageURL(): string {
+        return this.base64data
     }
 }
