@@ -6,7 +6,7 @@ import time
 import unittest
 
 from quack_norris.common.llm_provider import OpenAI
-from quack_norris.common._types import OllamaChatMessage, OllamaChatCompletionRequest
+from quack_norris.common._types import ChatMessage, ChatCompletionRequest
 
 os.chdir(os.path.dirname(__file__))
 
@@ -66,13 +66,13 @@ class TestAPIServer(unittest.TestCase):
         if not _manual_test_run():
             return
         messages = [
-            OllamaChatMessage(role="system", content="You are a helpful assistant."),
-            OllamaChatMessage(role="user", content="Who won the world series in 2020?"),
-            OllamaChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
-            OllamaChatMessage(role="user", content="Where was it played?"),
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Who won the world series in 2020?"),
+            ChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
+            ChatMessage(role="user", content="Where was it played?"),
         ]
         response = self.client.chat(
-            OllamaChatCompletionRequest(model="qwen2.5-coder:1.5b", messages=messages)
+            ChatCompletionRequest(model="qwen2.5-coder:1.5b", messages=messages)
         )
         print(response)
 
@@ -80,13 +80,13 @@ class TestAPIServer(unittest.TestCase):
         if not _manual_test_run():
             return
         messages = [
-            OllamaChatMessage(role="system", content="You are a helpful assistant."),
-            OllamaChatMessage(role="user", content="Who won the world series in 2020?"),
-            OllamaChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
-            OllamaChatMessage(role="user", content="Where was it played?"),
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Who won the world series in 2020?"),
+            ChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
+            ChatMessage(role="user", content="Where was it played?"),
         ]
         response = self.client.chat(
-            OllamaChatCompletionRequest(model="qwen2.5-coder:1.5b", messages=messages, stream=True)
+            ChatCompletionRequest(model="qwen2.5-coder:1.5b", messages=messages, stream=True)
         )
         for chunk in response:
             print(chunk, end="")
@@ -97,15 +97,15 @@ class TestAPIServer(unittest.TestCase):
         if not _manual_test_run():
             return
         messages = [
-            OllamaChatMessage(role="system", content="You are a helpful assistant."),
-            OllamaChatMessage(role="user", content="Who won the world series in 2020?"),
-            OllamaChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
-            OllamaChatMessage(role="user", content="Where was it played?"),
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Who won the world series in 2020?"),
+            ChatMessage(role="assistant", content="The LA Dodgers won in 2020."),
+            ChatMessage(role="user", content="Where was it played?"),
         ]
         fail = False
         try:
             response = self.client.chat(
-                OllamaChatCompletionRequest(model="non-existent", messages=messages)
+                ChatCompletionRequest(model="non-existent", messages=messages)
             )
         except RuntimeError as e:
             fail = True
