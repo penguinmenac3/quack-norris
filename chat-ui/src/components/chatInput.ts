@@ -1,5 +1,5 @@
 import "./chatInput.css"
-import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook } from "../icons";
+import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook, iconTrash } from "../icons";
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
 import { ActionButton } from "../webui/components/buttons";
@@ -95,7 +95,14 @@ export class ChatInput extends Module<HTMLDivElement> {
             reader.readAsDataURL(blob)
             reader.onloadend = function () {
                 var base64data = "" + reader.result
-                media.add(new Image(base64data))
+                let image = new Image(base64data)
+                image.onRemove = () => {
+                    media.remove(image)
+                    if (media.getChildren().length == 0) {
+                        media.hide()
+                    }
+                }
+                media.add(image)
                 media.show()
             }
         }
@@ -128,11 +135,19 @@ export class ChatInput extends Module<HTMLDivElement> {
 
 class Image extends Module<HTMLImageElement> {
     public constructor(private base64data: string) {
-        super("img", "")
-        this.htmlElement.src = base64data
+        super("div", "", "image")
+        let image = new Module<HTMLImageElement>("img")
+        image.htmlElement.src = base64data
+        this.add(image)
+        let remove = new ActionButton(iconTrash, () => { this.onRemove() })
+        this.add(remove)
     }
 
     public getImageURL(): string {
         return this.base64data
+    }
+
+    public onRemove() {
+        alert("Not yet implemented!")
     }
 }
