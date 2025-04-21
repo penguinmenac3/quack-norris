@@ -3,8 +3,9 @@ import { KWARGS, Module } from "../webui/module";
 import { ChatInput } from "./chatInput";
 import { ChatHistory } from "./chatHistory";
 import { ActionButton, DropdownButton } from "../webui/components/buttons";
-import { iconAIModel, iconDropdown } from "../icons";
+import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../icons";
 import { iconBars } from "../webui/icons";
+import { ConfirmCancelPopup } from "../webui/components/popup";
 
 export class Chat extends Module<HTMLDivElement> {
     public chatHistory: ChatHistory
@@ -17,6 +18,9 @@ export class Chat extends Module<HTMLDivElement> {
         let header = new Module<HTMLDivElement>("div", "", "chat-header")
         let conversations = new ActionButton(iconBars)
         header.add(conversations)
+        let newConversation = new ActionButton(iconTrash)
+        header.add(newConversation)
+        let quick_settings = new Module<HTMLSpanElement>("span", "", "fill-width")
         this.llm = new DropdownButton(iconAIModel + " " + this.model + " " + iconDropdown)
         this.llm.onAction = async () => {
             let models = await this.getModels()
@@ -30,17 +34,29 @@ export class Chat extends Module<HTMLDivElement> {
             }
             this.llm.showMenu(actions)
         }
-        header.add(this.llm)
+        quick_settings.add(this.llm)
         //let role = new DropdownButton(iconRoles + " General " + iconDropdown)
         // let roles = new Map<string, CallableFunction>()
         // roles.set("General", () => true)  // FIXME add roles like with LLM, but for now do nothing
         // role.setOptions(roles)
         // header.add(role)
+        header.add(quick_settings)
+        let settings = new ActionButton(iconSettings)
+        header.add(settings)
         this.add(header)
         this.chatHistory = new ChatHistory()
         this.add(this.chatHistory)
         this.chatInput = new ChatInput()
         this.add(this.chatInput)
+
+
+        newConversation.onAction = () => {
+            let popup = new ConfirmCancelPopup("Are you sure? (Will delete the entire conversation history)", "Yes", "Cancel")
+            popup.onConfirm = () => {
+                this.newConversation()
+            }
+            popup.onCancel = () => { }
+        }
     }
 
     public update(kwargs: KWARGS, _changedPage: boolean): void {

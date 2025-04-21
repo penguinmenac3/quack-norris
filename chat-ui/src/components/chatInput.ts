@@ -1,9 +1,8 @@
 import "./chatInput.css"
-import { iconCall, iconDropdown, iconMicrophone, iconTrash, iconPlus, iconSend, iconTool, iconWeb, iconBook } from "../icons";
+import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook } from "../icons";
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
-import { DropdownButton, ActionButton } from "../webui/components/buttons";
-import { ConfirmCancelPopup } from "../webui/components/popup";
+import { ActionButton } from "../webui/components/buttons";
 
 export class ChatInput extends Module<HTMLDivElement> {
     private input: Module<HTMLTextAreaElement>
@@ -18,8 +17,8 @@ export class ChatInput extends Module<HTMLDivElement> {
         let toolbar = new Module<HTMLDivElement>("div", "", "tool-bar")
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
-        let settings = new Module<HTMLSpanElement>("span", "", "settings")
-        let web_search = new ActionButton(iconWeb + " WebSearch")
+        let settings = new Module<HTMLSpanElement>("span", "", "fill-width")
+        let web_search = new ActionButton(iconWeb + " Web")
         web_search.setClass("with-text")
         settings.add(web_search)
         //let code = new ActionButton(iconTerminal + " Code")
@@ -28,14 +27,10 @@ export class ChatInput extends Module<HTMLDivElement> {
         let rag = new ActionButton(iconBook + " RaG")
         rag.setClass("with-text")
         settings.add(rag)
-        let tools = new DropdownButton(iconTool + " MCP Tools " + iconDropdown)
-        let tool_mapping = new Map<string, CallableFunction>()
-        tool_mapping.set("Not implemented yet!", () => true)
-        tools.setOptions(tool_mapping)
+        let tools = new ActionButton(iconTool + " Tools")
+        tools.setClass("with-text")
         settings.add(tools)
         toolbar.add(settings)
-        let newConversation = new ActionButton(iconTrash)
-        toolbar.add(newConversation)
         let microphone = new ActionButton(iconMicrophone)
         toolbar.add(microphone)
         this.call = new ActionButton(iconCall)
@@ -65,15 +60,6 @@ export class ChatInput extends Module<HTMLDivElement> {
             chat.sendMessage(text, images)
             this.input.htmlElement.value = ""
             this.onUpdateInput()
-        }
-
-        newConversation.onAction = () => {
-            let popup = new ConfirmCancelPopup("Are you sure? (Will delete the entire conversation history)", "Yes", "Cancel")
-            popup.onConfirm = () => {
-                let chat = this.parent! as Chat
-                chat.newConversation()
-            }
-            popup.onCancel = () => { }
         }
     }
 
