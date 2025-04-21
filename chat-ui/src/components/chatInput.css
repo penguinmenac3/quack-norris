@@ -7,11 +7,16 @@
     flex-direction: column;
     align-items: center;
     background-color: var(--color-base-2);  
+    border: 2px solid var(--color-base-2);
     border-radius: var(--radius);
     padding: 0.5em;
     padding-bottom: 0.2em;
     margin: 0.75em;
     box-shadow: 0 2px 3px var(--color-shadow-color);
+}
+
+.chat-input .ondrag {
+    border: 2px solid var(--color-brand);
 }
 
 .chat-input .tool-bar {

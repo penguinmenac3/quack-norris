@@ -90,6 +90,32 @@ export class ChatInput extends Module<HTMLDivElement> {
             }
         })
 
+        let timer = 0
+        container.htmlElement.ondragover = (ev: DragEvent) => {
+            ev.preventDefault()
+            if (ev.dataTransfer) {
+                container.setClass("ondrag")
+                if (timer != 0) {
+                    window.clearTimeout(timer)
+                    timer = 0
+                }
+                timer = window.setTimeout(() => { container.unsetClass("ondrag"); timer = 0 }, 200)
+            }
+        }
+
+        container.htmlElement.ondrop = (ev: DragEvent) => {
+            ev.preventDefault()
+            if (ev.dataTransfer) {
+                container.unsetClass("ondrag")
+                let data = ev.dataTransfer.files
+                for (let file of data) {
+                    if (file.type.startsWith("image")) {
+                        appendImage(file)
+                    }
+                }
+            }
+        }
+
         const appendImage = (blob: Blob) => {
             var reader = new FileReader()
             reader.readAsDataURL(blob)
