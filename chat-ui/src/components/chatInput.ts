@@ -3,6 +3,8 @@ import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBo
 import { Module } from "../webui/module";
 import { Chat } from "./chat";
 import { ActionButton } from "../webui/components/buttons";
+import { ExitablePopup } from "../webui/components/popup";
+import { FormInput, FormSubmit } from "../webui/components/form";
 
 export class ChatInput extends Module<HTMLDivElement> {
     private input: Module<HTMLTextAreaElement>
@@ -61,7 +63,7 @@ export class ChatInput extends Module<HTMLDivElement> {
             let images: string[] = []
             let chat = this.parent! as Chat
             for (let module of media.getChildren()) {
-                let image = module as Image
+                let image = module as InputImage
                 images.push(image.getImageURL())
             }
             media.removeChildren()
@@ -75,12 +77,12 @@ export class ChatInput extends Module<HTMLDivElement> {
             const clipboardItems = typeof navigator?.clipboard?.read === 'function' ? await navigator.clipboard.read() : e.clipboardData!.files
 
             for (const clipboardItem of clipboardItems) {
-                if ((clipboardItem instanceof File) && (clipboardItem.type?.startsWith('image/'))) {
+                if ((clipboardItem instanceof File) && (["image/png", "image/jpeg"].includes(clipboardItem.type))) {
                     appendImage(clipboardItem)
                     e.preventDefault()
                 } else if (clipboardItem instanceof ClipboardItem) {
                     // For files from `navigator.clipboard.read()`.
-                    const imageTypes = clipboardItem.types?.filter((type: string) => type.startsWith('image/'))
+                    const imageTypes = clipboardItem.types?.filter((type: string) => ["image/png", "image/jpeg"].includes(type))
                     for (const imageType of imageTypes) {
                         // Do something with the blob.
                         appendImage(await clipboardItem.getType(imageType))
@@ -109,11 +111,35 @@ export class ChatInput extends Module<HTMLDivElement> {
                 container.unsetClass("ondrag")
                 let data = ev.dataTransfer.files
                 for (let file of data) {
-                    if (file.type.startsWith("image")) {
+                    console.log(file.type)
+                    if (["image/png", "image/jpeg"].includes(file.type)) {
                         appendImage(file)
                     }
                 }
             }
+        }
+
+        addMedia.onAction = () => {
+            let popup = new ExitablePopup()
+            popup.add(new Module<HTMLDivElement>("div", "Add Image", "chat-add-media-header"))
+            let image_file = new FormInput("image", "your image", "file")
+            image_file.setClass("chat-add-media-input")
+            image_file.htmlElement.accept = "image/png, image/jpeg"
+            popup.add(image_file)
+            let submit = new FormSubmit("Upload")
+            submit.onClick = () => {
+                let files = image_file.htmlElement.files
+                if (files == null || files.length == 0) {
+                    return
+                }
+                for (let file of files) {
+                    if (["image/png", "image/jpeg"].includes(file.type)) {
+                        appendImage(file)
+                    }
+                }
+                popup.dispose()
+            }
+            popup.add(submit)
         }
 
         const appendImage = (blob: Blob) => {
@@ -121,7 +147,7 @@ export class ChatInput extends Module<HTMLDivElement> {
             reader.readAsDataURL(blob)
             reader.onloadend = function () {
                 var base64data = "" + reader.result
-                let image = new Image(base64data)
+                let image = new InputImage(base64data)
                 image.onRemove = () => {
                     media.remove(image)
                     if (media.getChildren().length == 0) {
@@ -159,7 +185,7 @@ export class ChatInput extends Module<HTMLDivElement> {
 }
 
 
-class Image extends Module<HTMLImageElement> {
+class InputImage extends Module<HTMLImageElement> {
     public constructor(private base64data: string) {
         super("div", "", "image")
         let image = new Module<HTMLImageElement>("img")
@@ -174,6 +200,6 @@ class Image extends Module<HTMLImageElement> {
     }
 
     public onRemove() {
-        alert("Not yet implemented!")
+        alert("Must be overwritten by creator!")
     }
 }

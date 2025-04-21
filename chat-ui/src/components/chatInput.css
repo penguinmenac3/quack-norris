@@ -70,3 +70,26 @@
 .chat-input .image .action:hover {
     background-color: var(--color-bad-hover);
 }
+
+.chat-add-media-header {
+    padding: 0.5em;
+    font-weight: bold;
+}
+
+.chat-add-media-input {
+    height: 3em;
+    width: 100%;
+    cursor: pointer;
+}
+
+.chat-add-media-input:hover {
+    background-color: var(--color-base-hover);
+}
+
+.chat-add-media-input::file-selector-button {
+    cursor: pointer;
+    height: 3em;
+    border: 0px;
+    border-radius: var(--radius);
+    background-color: inherit;
+}
