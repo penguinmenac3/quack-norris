@@ -11,7 +11,7 @@ export class Chat extends Module<HTMLDivElement> {
     public chatHistory: ChatHistory
     public chatInput: ChatInput
     private llm: DropdownButton
-    private model: string = "quack-norris"
+    private model: string = "loading..."
     
     public constructor(private apiEndpoint: string, private apiKey: string) {
         super("div", "", "chat")
@@ -34,6 +34,11 @@ export class Chat extends Module<HTMLDivElement> {
             }
             this.llm.showMenu(actions)
         }
+        window.setTimeout(async () => {
+            let models = await this.getModels()
+            this.model = models[0]
+            this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
+        }, 100)
         quick_settings.add(this.llm)
         //let role = new DropdownButton(iconRoles + " General " + iconDropdown)
         // let roles = new Map<string, CallableFunction>()

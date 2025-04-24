@@ -19,20 +19,16 @@ class QuackNorris(LLM):
         self._llm = LLMMultiplexer()
 
     def get_models(self) -> list[str]:
-        return ["quack-norris"] + [f"quack-norris/{model}" for model in self._llm.get_models()]
+        return ["automatic"] + sorted(self._llm.get_models())
 
     def embeddings(self, request: EmbeddingRequest) -> list[list[float]]:
-        if request.model == "quack-norris":
+        if request.model == "automatic":
             request.model = "nomic-embed-text"
-        if request.model.startswith("quack-norris/"):
-            request.model = request.model.replace("quack-norris/", "")
         return self._llm.embeddings(request)
 
     def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
-        if request.model == "quack-norris":
+        if request.model == "automatic":
             request.model = self._default_model
-        if request.model.startswith("quack-norris/"):
-            request.model = request.model.replace("quack-norris/", "")
         msg = request.messages[-1].text()
         command = self._detect_command(msg)
         if command is not None:
