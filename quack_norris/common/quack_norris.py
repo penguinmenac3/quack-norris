@@ -23,7 +23,7 @@ class QuackNorris(LLM):
 
     def embeddings(self, request: EmbeddingRequest) -> list[list[float]]:
         if request.model == "automatic":
-            request.model = "nomic-embed-text"
+            request.model = "nomic-embed-text:latest"
         return self._llm.embeddings(request)
 
     def chat(self, request: ChatCompletionRequest) -> str | Generator[str, None, None]:
