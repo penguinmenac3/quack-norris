@@ -1,37 +1,15 @@
 # 🦆 Quack Norris - the code savy star 🌟 
 
-![picture of quack norris](quack_norris/ui/assets/icons/duck_low_res.png)
+![picture of quack norris](images/duck_low_res.png)
 
 Are you tired of spending hours ⏳ debugging your code? Look no further! Quack Norris 🦆 is here to save the day. This AImazing rubber duck will be your trusty AI companion 🤖, helping you tackle anything on your PC 💻.
 
-**Unified API Access to Agentic AI**: Experience seamless integration with leading language models through our unified API. This innovative platform supports agentic AI, allowing tools and retrieval-augmented generation (RAG) functionalities to be transparently utilized by any connecting app - whether it's focused on chat or other tasks. 🤖💬
-
-**Global Conversations**: Our advanced feature intelligently aggregates conversations from various connections into a cohesive global conversation, powered by the `quack-norris-global` model (itself using any model you want in the background). This ensures continuity and context across multiple interactions, enhancing your user experience and productivity. 🚀🌐
-
-
-## 🛠️ Installation
-
-```bash
-# for server use (just backend)
-pip install quack-norris
-
-# for desktop use (includes ui)
-pip install quack-norris[ui]
-```
-
+**Agentic AI Core**: Experience agentic AI using any language model provider through this UI. This innovative platform allows tools and retrieval-augmented generation (RAG) functionalities to be used with ease. 🤖💬
 
 ## 👨‍💻 Usage 
 
-Run the ui or server from the commandline.
-```bash
-# run server
-quack-norris-server
-
-# run ui (including local server, if not present)
-quack-norris-ui
-```
-
-If you want to add quack norris to the autostart or the startmenu on windows, simply find the `quack-norris-ui.exe`, wherever your python installation put it and add a **link** to it to your startmenu (in the right click settings, you can even configure an icon). You can find the startmenu here: `C:\Users\YOUR_USERNAME\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`.
+Visit https://penguinmenac3.github.io/quack-norris/ and install it as a web app.
+Additionally you can use the [quack-norris-floaty](https://penguinmenac3.github.io/quack-norris-floaty/) to have the app available on your desktop at all times.
 
 ### Enable CORS for OLLAMA
 
@@ -42,101 +20,50 @@ To achieve this, add `OLLAMA_ORIGINS=*` to the environment variables.
 
 ### 🎨 Config
 
-Config files can be created in the current working directory or in your users config folder `~/.config/quack_norris/`.
+When you open the app for the first time, it will try to use your local ollama as an LLM provider.
+If you do not have ollama or want to use any Open AI compatible LLM service, you can open the settings and configure your LLM connections there.
 
-In your `server.json` you can configure the server host and port.
-```json
-{
-  "host": "127.0.0.1",
-  "port": 11337
-}
-```
-
-In your `ui.json` you can configure the chat OpenAI style API endpoint to use.
-```json
-{
-  "apiEndpoint": "http://127.0.0.1:1337",
-  "apiKey": "INSERT_YOUR_KEY_HERE",
-  "model": "quack-norris",
-}
-```
-
-In the `ui.json`, you can even replace the url the launcher opens as a chat app and customize the icon.
-```json
-{
-  "chat_url": "https://chatgpt.com/",
-  "launcher_ctrl_click_to_exit": false,
-  "launcher_size": [84, 84],
-  "launcher_icon": "my_icon.png"
-}
-```
-
-
-### 🌐 API
-
-The server exposes an OpenAI style API for you to use in other tools as well.
-However, to access all features, you need to know the following:
-* `model = "quack-norris"` uses whatever is selected by quack norris (user, agent or router)
-  - `model = "quack-norris:code"` hints that we prefer a code savy model
-* `model = "quack-norris-global"` (and variants) use the same conversation accross all connections (not per connection)
-  - allows you to have a conversation across multiple applications (breaking boundaries between your IDE and quack-norris-ui)
-  - `quack-norris-ui` uses the global model by default
-* `/cmd` - slash-commands allow you to interact with the server instead of the model (returns the response of the command instead of a model response)
-  - `/fetch` gets the messages in the chat since your last message
-  - `/new [name]` starts a new chat with the model using the (optional) name (use timestamp as name for unnamed chats)
-  - `/clear` is an alias for `/new`
-  - `/rename name` rename the current conversation to a new name
-  - `/select name` change to another conversation
-  - `/model modelname` change the model of the conversation (e.g. `/model llama3.2:7b`)
-  - `/list` list all available conversations
+Additionally, you can configure connections to tool servers provided via the Open API standard.
+To wrap MCP servers and make them available use [MCPO from Open WebUI](https://github.com/open-webui/mcpo).
 
 
 ## 💡 Roadmap
 
-* Server
-  - [X] Provide OpenAI Rest API Endpoint
-  - [X] Route requests to LLM via an OpenAI API (proxy)
-  - [X] Route quack norris model variants to custom chat handler
-  - [ ] Implement commands for quack norris chat handler
-  - [ ] Implement named and unnamed chats (history management)
-  - [ ] Implement global chat mangling
-  - [ ] Implement quack norris chat router (agentic, tools)
-  - [ ] Implement agentic AI core
-  - [ ] Implement tool calling (for AI and User)
-  - Implement tools
-    * [ ] Web Search (get urls + abstract)
-    * [ ] Web Scraper (get content of url as text)
-    * [ ] Search Wikipedia (get article names + abstract)
-    * [ ] Read Wikipedia (get wikipedia article on topic as text)
-    * [ ] RaG Context Retriever (get filename and text snippet as context)
-    * [ ] Document Read (printout content of a file)
-    * [ ] Document Writer (write text to a file)
-    * [ ] Paper Search (Arxiv, Google Scholar)
-    * [ ] Paper Summarize - Pass 1 (fast, short summary of a transcribed pdf)
-    * [ ] Paper Summarize - Pass 2 (detailed summary of a pass 1 summarized paper)
-    * [ ] PDF Downloader (Arxiv, Google Scholar or url)
-    * [ ] PDF Transcribe (pdf to markdown/text)
-    * [ ] Podcast Creator (generate a podcast explaining the content of a document)
-  - [ ] Provide E-Mail endpoint (write mail and AI will respond to you)
-  - [ ] Provide Phone Call endpoint (call via phone and AI will respond to you)
-  - [ ] Startup/boot a model server, if needed (e.g. raspi starts gaming PC)
-* [ ] UI
-  - [X] A floating duck (movable)
-  - [X] Click opens a chat window with buttons for actions
-  - Implement Actions:
-    * [ ] Manage Chats
-      - [X] New chat
-      - [ ] Download current chat as markdown
-      - [ ] Reopen old conversation
-      - [ ] Change model for current chat
-    * [ ] Allow pasting of a screenshot
-    * [ ] Allow uploading of an image
-    * [ ] Transcribe Audio (into chat input)
-      - use transcript to chat with AI
-      - use "Document Writer" tool to take notes
-    * [ ] Call (transcript is sent after a pause, response is read and it listenes again for user input)
-
-
+- UX / UI
+  * [ ] Settings
+    - [ ] Configure connections to LLMs
+    - [ ] Configure connections to tools
+  * [ ] Manage Chats
+    - [X] New chat
+    - [X] Change model for current chat
+    - [ ] Download current chat as markdown
+    - [ ] Reopen old conversation
+    - [ ] Delete old conversation
+  * [X] Image support (allow pasting, dragging or uploading an image / screenshot)
+  * [ ] Activate / deactivate tools
+    - [ ] Quick tools (Web, RaG)
+    - [ ] Other tools (via dropdown)
+  * [ ] Transcribe Audio (Speech-To-Text into chat input)
+  * [ ] Read out responses (Text-To-Speech)
+  * [ ] Call (transcript is sent after a pause, response is read and it listenes again for user input)
+- AI Features
+  * [ ] Agentic core loop (plan, think, tool, response, done)
+  * [ ] Built-in Web Tools
+    * [ ] Search Web (get urls + abstract)  *(if possible)*
+    * [ ] Read Web (get content of url as text)  *(if possible)*
+    * [ ] ~~Search Wikipedia (get article names + abstract)~~
+    * [ ] ~~Read Wikipedia (get wikipedia article on topic as text)~~
+    * [ ] ~~Search Paper (Arxiv, Google Scholar + abstract)~~
+    * [ ] ~~Read Paper (get arxiv paper content)~~
+  * [ ] ~~Built-in RaG Tools~~ (no built-in tools)
+    * [ ] ~~Configure WebFS connections~~
+    * [ ] ~~WebFS retriever (filename + context chunk)~~
+    * [ ] ~~WebFS file search (filename)~~
+    * [ ] ~~WebFS read file (file content)~~
+    * [ ] ~~WebFS write file (write to file with user confirmation)~~
+  * [ ] Adding tools
+    * [ ] Discover tools (given a url and header auth options) and add them to other tools
+    * [ ] Add tools to rag or web group, if they are tagged accordingly
 
 ## 👥 Contributing
 
@@ -153,14 +80,13 @@ The rules for AI will also apply to human contributors.
 Run the build command, add and commit the dist folder and then push this folger to gh-pages.
 
 ```
-cd chat-ui
 npm run build
 rm dist/favicon.kra
 git add -f dist
 git commit -m "Build gh-pages."
 git push
 cd ..
-git subtree push --prefix chat-ui/dist origin gh-pages
+git subtree push --prefix dist origin gh-pages
 ```
 
 ## ⚖️ License
