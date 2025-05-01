@@ -64,18 +64,7 @@ export class Chat extends Module<HTMLDivElement> {
         }
     }
 
-    public update(kwargs: KWARGS, _changedPage: boolean): void {
-        if (kwargs.apiEndpoint) {
-            this.apiEndpoint = kwargs.apiEndpoint
-        }
-        if (kwargs.apiKey) {
-            this.apiKey = kwargs.apiKey
-        }
-        if (kwargs.model) {
-            this.model = kwargs.model
-        }
-        window.location.hash = "chat"
-    }
+    public update(_kwargs: KWARGS, _changedPage: boolean): void { }
 
     public async sendMessage(message: string, images: string[]) {
         this.chatHistory.addMessage(message, images)
