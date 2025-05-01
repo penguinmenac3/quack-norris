@@ -2,7 +2,7 @@ import './webui/core.css'
 import './webui/colors.css'
 import { STRINGS, setupLanguage } from './language/default'
 import { PageManager } from './webui/pagemanager'
-import { Chat } from './components/chat'
+import { Chat } from './ai_chat/chat'
 
 
 async function main() {
