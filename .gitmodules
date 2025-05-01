@@ -1,3 +1,3 @@
-[submodule "chat-ui/src/webui"]
-	path = chat-ui/src/webui
+[submodule "src/webui"]
+	path = src/webui
 	url = https://github.com/penguinmenac3/WebUI.git
