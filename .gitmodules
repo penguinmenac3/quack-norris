@@ -1,0 +1,3 @@
+[submodule "src/webui"]
+	path = src/webui
+	url = https://github.com/penguinmenac3/WebUI.git
