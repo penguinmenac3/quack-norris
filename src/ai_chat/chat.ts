@@ -43,9 +43,13 @@ export class Chat extends Module<HTMLDivElement> {
             }
             // If the model does not exist, just take the first
             if (!models.includes(this.model)) {
-                this.model = models[0]
+                if (models[0]) {
+                    this.model = models[0]
+                    localStorage["quack-norris-model"] = this.model
+                } else {
+                    this.model = "(no model found)"
+                }
             }
-            localStorage["quack-norris-model"] = this.model
             this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
         }, 100)
         quick_settings.add(this.llm)
