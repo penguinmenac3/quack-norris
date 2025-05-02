@@ -6,6 +6,7 @@ import { ActionButton, DropdownButton } from "../webui/components/buttons";
 import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../icons";
 import { iconBars } from "../webui/icons";
 import { ConfirmCancelPopup } from "../webui/components/popup";
+import { LLMs } from "./utils/llms";
 
 export class Chat extends Module<HTMLDivElement> {
     public chatHistory: ChatHistory
@@ -13,7 +14,7 @@ export class Chat extends Module<HTMLDivElement> {
     private llm: DropdownButton
     private model: string = "loading..."
     
-    public constructor(private apiEndpoint: string, private apiKey: string) {
+    public constructor() {
         super("div", "", "chat")
         let header = new Module<HTMLDivElement>("div", "", "chat-header")
         let conversations = new ActionButton(iconBars)
@@ -23,11 +24,12 @@ export class Chat extends Module<HTMLDivElement> {
         let quick_settings = new Module<HTMLSpanElement>("span", "", "fill-width")
         this.llm = new DropdownButton(iconAIModel + " " + this.model + " " + iconDropdown)
         this.llm.onAction = async () => {
-            let models = await this.getModels()
+            let models = await LLMs.getInstance().getModels()
             let actions = new Map<string, CallableFunction>()
             for (let model of models) {
                 actions.set(model, () => {
                     this.model = model
+                    localStorage["quack-norris-model"] = this.model
                     this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
                     return true
                 })
@@ -35,8 +37,15 @@ export class Chat extends Module<HTMLDivElement> {
             this.llm.showMenu(actions)
         }
         window.setTimeout(async () => {
-            let models = await this.getModels()
-            this.model = models[0]
+            let models = await LLMs.getInstance().getModels()
+            if (localStorage["quack-norris-model"]) {
+                this.model = localStorage["quack-norris-model"]
+            }
+            // If the model does not exist, just take the first
+            if (!models.includes(this.model)) {
+                this.model = models[0]
+            }
+            localStorage["quack-norris-model"] = this.model
             this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
         }, 100)
         quick_settings.add(this.llm)
@@ -127,22 +136,6 @@ export class Chat extends Module<HTMLDivElement> {
 
         // When streaming completed, save the chat history again
         this.chatHistory.saveMessages()
-    }
-
-    public async getModels(): Promise<string[]> {
-        const response = await fetch(this.apiEndpoint + "/models", {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${this.apiKey}`,
-                'Content-Type': 'application/json',
-            },
-        })
-        let data = await response.json()
-        let models = []
-        for (let model of data["data"]) {
-            models.push(model["id"])
-        }
-        return models
     }
 
     public newConversation() {

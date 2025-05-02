@@ -1,9 +1,9 @@
 export enum APIType {
-    OpenAI,
-    AzureOpenAI
+    OpenAI = "OpenAI",
+    AzureOpenAI = "AzureOpenAI"
 }
 
-interface APIConnection{
+interface APIConnection {
     apiEndpoint: string;
     apiKey: string;
     type: APIType;
@@ -20,20 +20,45 @@ export class LLMs {
     private connections: APIConnection[] = []
     private models = new Map<string, number>()
 
-    private constructor() {}
+    private constructor() {
+        if (localStorage["quack-norris-llms"]) {
+            this.connections = JSON.parse(localStorage["quack-norris-llms"])
+        } else {
+            this.addConnection("http://localhost:11434/v1", "")
+        }
+    }
 
-    public async addConnection(apiEndpoint: string, apiKey: string, type: APIType): Promise<boolean> {
+    public async addConnection(apiEndpoint: string, apiKey: string, type: APIType = APIType.OpenAI): Promise<boolean> {
         this.connections.push({
             "apiEndpoint": apiEndpoint,
             "apiKey": apiKey,
             "type": type
         })
+        localStorage["quack-norris-llms"] = JSON.stringify(this.connections)
         return true
     }
 
     public async getModels(): Promise<string[]> {
-        // TODO request models from all connections and collect them in the models map
-        return []
+        let models = []
+        this.models.clear()
+        let idx = 0
+        for (let connection of this.connections) {
+            const response = await fetch(connection.apiEndpoint + "/models", {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${connection.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+            })
+            let data = await response.json()
+            for (let model of data["data"]) {
+                let modelname = model["id"]
+                models.push(modelname)
+                this.models.set(modelname, idx)
+            }
+            idx += 1
+        }
+        return models.sort()
     }
 
     public async chat(model: string, history: any) {

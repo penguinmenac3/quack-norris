@@ -11,7 +11,7 @@ async function main() {
   new PageManager(
     "chat",
     {
-      chat: new Chat("http://localhost:11434/v1", ""),
+      chat: new Chat(),
     }
   )
 }
