@@ -34,12 +34,24 @@ export class LLMs {
         }
     }
 
+    public getConnections(): APIConnection[] {
+        return this.connections
+    }
+
     public async addConnection(apiEndpoint: string, apiKey: string, type: APIType = APIType.OpenAI): Promise<boolean> {
         this.connections.push({
             "apiEndpoint": apiEndpoint,
             "apiKey": apiKey,
             "type": type
         })
+        localStorage["quack-norris-llms"] = JSON.stringify(this.connections)
+        return true
+    }
+
+    public removeConnection(connection: APIConnection): boolean {
+        let idx = this.connections.indexOf(connection)
+        if (idx < 0) return false
+        this.connections.splice(idx, 1)
         localStorage["quack-norris-llms"] = JSON.stringify(this.connections)
         return true
     }

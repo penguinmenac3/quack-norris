@@ -5,8 +5,10 @@ import { ChatHistory } from "./chatHistory";
 import { ActionButton, DropdownButton } from "../webui/components/buttons";
 import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../icons";
 import { iconBars } from "../webui/icons";
-import { ConfirmCancelPopup } from "../webui/components/popup";
-import { LLMs } from "./utils/llms";
+import { ConfirmCancelPopup, ExitablePopup } from "../webui/components/popup";
+import { APIType, LLMs } from "./utils/llms";
+import { Button, FormHeading, FormInput, FormLabel, FormRadioButtonGroup, FormSubmit, FormVSpace } from "../webui/components/form";
+import { Tools } from "./utils/tools";
 
 export class Chat extends Module<HTMLDivElement> {
     public chatHistory: ChatHistory
@@ -75,6 +77,59 @@ export class Chat extends Module<HTMLDivElement> {
             }
             popup.onCancel = () => { }
         }
+
+        settings.onAction = () => {
+            let popup = new ExitablePopup("popupContent-fullscreen")
+            // LLMs
+            popup.add(new FormHeading("LLM Connections"))
+            let connections = LLMs.getInstance().getConnections()
+            for (let connection of connections) {
+                popup.add(new RemovableItem(
+                    connection.apiEndpoint,
+                    () => { LLMs.getInstance().removeConnection(connection) }
+                ))
+            }
+            popup.add(new FormHeading("Add LLM Server", "h2"))
+            popup.add(new FormLabel("apiEndpoint"))
+            let apiEndpoint = new FormInput("apiEndpoint", "https://localhost:11434/v1", "text")
+            popup.add(apiEndpoint)
+            popup.add(new FormLabel("apiKey"))
+            let apiKey = new FormInput("apiKey", "f5a20...", "password")
+            popup.add(apiKey)
+            popup.add(new FormLabel("apiType"))
+            let apiType = new FormRadioButtonGroup("apiType", [APIType.OpenAI, APIType.AzureOpenAI])
+            apiType.value(0)
+            popup.add(apiType)
+            let addLLM = new FormSubmit("Add LLM Server", "buttonWide")
+            addLLM.onClick = () => {
+                LLMs.getInstance().addConnection(apiEndpoint.value(), apiKey.value(), apiType.value() as any)
+                popup.dispose()
+            }
+            popup.add(addLLM)
+            // Tools
+            popup.add(new FormVSpace("3em"))
+            popup.add(new FormHeading("Tool Connections"))
+            let tools = Tools.getInstance().getConnections()
+            for (let connection of tools) {
+                popup.add(new RemovableItem(
+                    connection.apiEndpoint,
+                    () => { Tools.getInstance().removeConnection(connection) }
+                ))
+            }
+            popup.add(new FormHeading("Add Tool Server", "h2"))
+            popup.add(new FormLabel("toolEndpoint"))
+            let toolEndpoint = new FormInput("toolEndpoint", "https://localhost:1337", "text")
+            popup.add(toolEndpoint)
+            popup.add(new FormLabel("toolKey"))
+            let toolKey = new FormInput("toolKey", "f5a20...", "password")
+            popup.add(toolKey)
+            let addTool = new FormSubmit("Add Tool Server", "buttonWide")
+            addTool.onClick = () => {
+                Tools.getInstance().addConnection(toolEndpoint.value(), toolKey.value())
+                popup.dispose()
+            }
+            popup.add(addTool)
+        }
     }
 
     public update(_kwargs: KWARGS, _changedPage: boolean): void { }
@@ -95,5 +150,16 @@ export class Chat extends Module<HTMLDivElement> {
 
     public newConversation() {
         this.chatHistory.clear()
+    }
+}
+
+
+class RemovableItem extends Module<HTMLDivElement> {
+    constructor(text: string, callback: CallableFunction) {
+        super("div", text, "removableItem")
+        let button = new ActionButton(iconTrash)
+        button.setClass("right")
+        button.onAction = () => { this.hide(); callback() }
+        this.add(button)
     }
 }

@@ -64,3 +64,16 @@
 .chat .action:hover {
     background-color: var(--color-contrast-gray);
 }
+
+.removableItem {
+    align-content: center;
+    text-align: center;
+    line-height: 1.8em;
+    padding: 0.2em;
+    height: 2em;
+    border-radius: var(--radius);
+}
+
+.removableItem:hover {
+    background-color: var(--color-base-hover);
+}
