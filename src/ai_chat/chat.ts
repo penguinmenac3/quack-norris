@@ -22,7 +22,7 @@ export class Chat extends Module<HTMLDivElement> {
         let newConversation = new ActionButton(iconTrash)
         header.add(newConversation)
         let quick_settings = new Module<HTMLSpanElement>("span", "", "fill-width")
-        this.llm = new DropdownButton(iconAIModel + " " + this.model + " " + iconDropdown)
+        this.llm = new DropdownButton(iconAIModel + " " + this.model + " " + iconDropdown, null, true)
         this.llm.onAction = async () => {
             let models = await LLMs.getInstance().getModels()
             let actions = new Map<string, CallableFunction>()
