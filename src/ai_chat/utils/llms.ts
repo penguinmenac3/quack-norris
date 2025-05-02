@@ -3,6 +3,12 @@ export enum APIType {
     AzureOpenAI = "AzureOpenAI"
 }
 
+export interface IChatMessage {
+    getText(): string
+    getImages(): string[]
+    getRole(): string
+}
+
 interface APIConnection {
     apiEndpoint: string;
     apiKey: string;
@@ -61,17 +67,67 @@ export class LLMs {
         return models.sort()
     }
 
-    public async chat(model: string, history: any) {
+    public async* chat(model: string, history: IChatMessage[]): AsyncGenerator<string, void> {
         let idx = this.models.get(model)
-        if (!idx) return
+        if (idx === undefined) {
+            yield "ERROR: Cannot find a connection serving the requested model!"
+            return
+        }
         let connection = this.connections[idx]
 
         if (connection.type == APIType.OpenAI) {
-            return "TODO OpenAI API Chat"
+            let messages = []
+            for (let message of history) {
+                let content: any[] = [{
+                    "type": "text",
+                    "text": message.getText()
+                }]
+                for (let image of message.getImages()) {
+                    content.push({
+                        "type": "image_url",
+                        "image_url": { "url": image }
+                    })
+                }
+                messages.push({
+                    "role": message.getRole(),
+                    "content": content
+                })
+            }
+
+            // Stream in the result into the message entity
+            const response = await fetch(connection.apiEndpoint + "/chat/completions", {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${connection.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    stream: true,
+                }),
+            });
+            const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+            if (!reader) return;
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                // eslint-disable-next-line no-await-in-loop
+                const { value, done } = await reader.read();
+                if (done) break;
+                const arr = value.split('\n');
+                for (let data of arr) {
+                    if (data.length === 0) continue // ignore empty message
+                    if (data.startsWith(':')) continue // ignore sse comment message
+                    if (data === 'data: [DONE]') return  // exit the stream if we are done
+                    const json = JSON.parse(data.substring(6))
+                    let text = json.choices[0]["delta"]["content"]
+                    yield text
+                }
+            }
         } else if (connection.type == APIType.AzureOpenAI) {
-            return "TODO AzureOpenAI API Chat"
+            yield "ERROR: AzureOpenAI chat endpoint not implemented yet!"
         } else {
-            return "Unsupported API"
+            yield "ERROR: Unsupported chat API type!"
         }
     }
 

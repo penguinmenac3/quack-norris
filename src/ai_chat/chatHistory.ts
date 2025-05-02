@@ -7,6 +7,7 @@ import { iconAIModel, iconCopy, iconEdit, iconRefresh, iconTrash } from "../icon
 import { Chat } from "./chat";
 import { copyToClipboard } from "../webui/utils/copy";
 import { ConfirmCancelPopup } from "../webui/components/popup";
+import { IChatMessage } from "./utils/llms";
 
 export class EditBar extends Module<HTMLDivElement> {
     public constructor(history: ChatHistory, message: ChatMessage, isModel: boolean) {
@@ -65,7 +66,7 @@ class Thought extends Module<HTMLDivElement> {
     }
 }
 
-export class ChatMessage extends Module<HTMLDivElement> {
+export class ChatMessage extends Module<HTMLDivElement> implements IChatMessage {
     private content: Module<HTMLDivElement>
     private modelDiv: Module<HTMLDivElement>
 
