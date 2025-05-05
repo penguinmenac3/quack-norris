@@ -152,7 +152,7 @@ export class LLMs {
         }
     }
 
-    public async embed(model: string, text: string) {
+    public async embed(model: string, _text: string) {
         let [connectionName, _modelName] = model.split("/")
         let connection = this.connections.get(connectionName)
         if (!connection) {

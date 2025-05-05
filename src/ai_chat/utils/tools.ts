@@ -72,7 +72,7 @@ export class Tools {
         return result
     }
 
-    public async callTool(tool_name: string, args: any): Promise<string> {
+    public async callTool(tool_name: string, _args: any): Promise<string> {
         if (!this.authorized_tools.includes(tool_name)) {
             // TODO ask for permission from user (always, once, decline)
             // TODO always -> add to authorized_tools
@@ -85,6 +85,7 @@ export class Tools {
         let connection = this.connections[tool.connection_idx]
         // TODO validate args against arg_schema
         // TODO send args to connection
+        connection.apiEndpoint
         return ""
     }
 }

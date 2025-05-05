@@ -7,7 +7,7 @@ import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../icons";
 import { iconBars } from "../webui/icons";
 import { ConfirmCancelPopup, ExitablePopup } from "../webui/components/popup";
 import { APIType, LLMs } from "./utils/llms";
-import { Button, FormHeading, FormInput, FormLabel, FormRadioButtonGroup, FormSubmit, FormVSpace } from "../webui/components/form";
+import { FormHeading, FormInput, FormLabel, FormRadioButtonGroup, FormSubmit, FormVSpace } from "../webui/components/form";
 import { Tools } from "./utils/tools";
 
 export class Chat extends Module<HTMLDivElement> {
