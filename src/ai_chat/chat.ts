@@ -85,24 +85,53 @@ export class Chat extends Module<HTMLDivElement> {
             let connections = LLMs.getInstance().getConnections()
             for (let connection of connections) {
                 popup.add(new RemovableItem(
-                    connection.apiEndpoint,
+                    connection.name + " (" + connection.apiEndpoint + ")",
                     () => { LLMs.getInstance().removeConnection(connection) }
                 ))
             }
             popup.add(new FormHeading("Add LLM Server", "h2"))
+            popup.add(new FormLabel("name"))
+            let apiName = new FormInput("apiName", "Ollama", "text")
+            popup.add(apiName)
             popup.add(new FormLabel("apiEndpoint"))
             let apiEndpoint = new FormInput("apiEndpoint", "https://localhost:11434/v1", "text")
             popup.add(apiEndpoint)
             popup.add(new FormLabel("apiKey"))
             let apiKey = new FormInput("apiKey", "f5a20...", "password")
             popup.add(apiKey)
+            popup.add(new FormLabel("model"))
+            let model = new FormInput("model", "(leave blank for autodetect)", "text")
+            popup.add(model)
             popup.add(new FormLabel("apiType"))
-            let apiType = new FormRadioButtonGroup("apiType", [APIType.OpenAI, APIType.AzureOpenAI])
+            let apiTypeOptions = [APIType.OpenAI, APIType.AzureOpenAI]
+            let apiType = new FormRadioButtonGroup("apiType", apiTypeOptions)
             apiType.value(0)
             popup.add(apiType)
             let addLLM = new FormSubmit("Add LLM Server", "buttonWide")
             addLLM.onClick = () => {
-                LLMs.getInstance().addConnection(apiEndpoint.value(), apiKey.value(), apiType.value() as any)
+                let selectedApi = apiType.value() as any
+                if (!(selectedApi instanceof String)) {
+                    selectedApi = apiTypeOptions[selectedApi]
+                }
+                if (apiName.value() == "") {
+                    alert("name must not be empty!")
+                    return
+                }
+                if (apiEndpoint.value() == "") {
+                    alert("apiEndpoint must not be empty!")
+                    return
+                }
+                if (apiKey.value() == "") {
+                    alert("apiKey must not be empty!")
+                    return
+                }
+                LLMs.getInstance().addConnection(
+                    apiName.value(),
+                    apiEndpoint.value(),
+                    apiKey.value(),
+                    model.value(),
+                    selectedApi,
+                )
                 popup.dispose()
             }
             popup.add(addLLM)

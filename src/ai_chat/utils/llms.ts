@@ -10,9 +10,11 @@ export interface IChatMessage {
 }
 
 interface APIConnection {
-    apiEndpoint: string;
-    apiKey: string;
-    type: APIType;
+    name: string
+    apiEndpoint: string
+    apiKey: string
+    type: APIType
+    model: string
 }
 
 
@@ -23,71 +25,72 @@ export class LLMs {
         return this.instance
     }
 
-    private connections: APIConnection[] = []
-    private models = new Map<string, number>()
+    private connections = new Map<string, APIConnection>()
 
     private constructor() {
         if (localStorage["quack-norris-llms"]) {
-            this.connections = JSON.parse(localStorage["quack-norris-llms"])
+            this.connections = new Map(JSON.parse(localStorage["quack-norris-llms"]))
         } else {
-            this.addConnection("http://localhost:11434/v1", "")
+            this.addConnection("Ollama", "http://localhost:11434/v1", "", "")
         }
     }
 
     public getConnections(): APIConnection[] {
-        return this.connections
+        return Array.from(this.connections.values())
     }
 
-    public async addConnection(apiEndpoint: string, apiKey: string, type: APIType = APIType.OpenAI): Promise<boolean> {
-        this.connections.push({
+    public async addConnection(name: string, apiEndpoint: string, apiKey: string, model: string, type: APIType = APIType.OpenAI): Promise<boolean> {
+        this.connections.set(name, {
+            "name": name,
             "apiEndpoint": apiEndpoint,
             "apiKey": apiKey,
-            "type": type
+            "type": type,
+            "model": model
         })
-        localStorage["quack-norris-llms"] = JSON.stringify(this.connections)
+        localStorage["quack-norris-llms"] = JSON.stringify(Array.from(this.connections.entries()))
         return true
     }
 
     public removeConnection(connection: APIConnection): boolean {
-        let idx = this.connections.indexOf(connection)
-        if (idx < 0) return false
-        this.connections.splice(idx, 1)
-        localStorage["quack-norris-llms"] = JSON.stringify(this.connections)
+        this.connections.delete(connection.name)
+        localStorage["quack-norris-llms"] = JSON.stringify(Array.from(this.connections.entries()))
         return true
     }
 
     public async getModels(): Promise<string[]> {
         let models = []
-        this.models.clear()
         let idx = 0
-        for (let connection of this.connections) {
-            try {
-                const response = await fetch(connection.apiEndpoint + "/models", {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${connection.apiKey}`,
-                        'Content-Type': 'application/json',
-                    },
-                })
-                let data = await response.json()
-                for (let model of data["data"]) {
-                    let modelname = model["id"]
-                    models.push(modelname)
-                    this.models.set(modelname, idx)
-                }
-                idx += 1
-            } catch { console.log("Failed to connect to " + connection.apiEndpoint) }
+        for (let connection of this.getConnections()) {
+            if (connection.model != "") {
+                models.push(connection.name + "/" + connection.model)
+            } else {
+                try {
+                    const response = await fetch(connection.apiEndpoint + "/models", {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${connection.apiKey}`,
+                            'Content-Type': 'application/json',
+                        },
+                    })
+                    let data = await response.json()
+                    for (let model of data["data"]) {
+                        let modelname = connection.name + "/" + model["id"]
+                        models.push(modelname)
+                    }
+                } catch { console.log("Failed to connect to " + connection.apiEndpoint) }
+            }
+            idx += 1
         }
         return models.sort()
     }
 
     public async* chat(model: string, history: IChatMessage[]): AsyncGenerator<string, void> {
-        let idx = this.models.get(model)
-        if (idx === undefined) {
+        let [connectionName, modelName] = model.split("/")
+        let connection = this.connections.get(connectionName)
+        if (!connection) {
             yield "ERROR: The model '" + model + "' is unavailable. Check your llm connections."
             return
         }
-        let connection = this.connections[idx]
 
         if (connection.type == APIType.OpenAI) {
             let messages = []
@@ -117,7 +120,7 @@ export class LLMs {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        model: model,
+                        model: modelName,
                         messages: messages,
                         stream: true,
                     }),
@@ -150,9 +153,11 @@ export class LLMs {
     }
 
     public async embed(model: string, text: string) {
-        let idx = this.models.get(model)
-        if (!idx) return
-        let connection = this.connections[idx]
+        let [connectionName, _modelName] = model.split("/")
+        let connection = this.connections.get(connectionName)
+        if (!connection) {
+            return "ERROR: The model '" + model + "' is unavailable. Check your llm connections."
+        }
 
         if (connection.type == APIType.OpenAI) {
             return "TODO OpenAI API Embed"
