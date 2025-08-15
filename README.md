@@ -9,7 +9,7 @@ Are you tired of spending hours ⏳ debugging your code? Look no further! Quack 
 ## 👨‍💻 Usage 
 
 Visit https://penguinmenac3.github.io/quack-norris/ and install it as a web app.
-Additionally you can use the [quack-norris-floaty](https://penguinmenac3.github.io/quack-norris-floaty/) to have the app available on your desktop at all times.
+Additionally you can use the [quack-norris-floaty](https://penguinmenac3.github.io/quack-norris-floaty/) to have the app available on your desktop at all times, but there some features might not work fully.
 
 ### Enable CORS for OLLAMA
 
@@ -21,49 +21,37 @@ To achieve this, add `OLLAMA_ORIGINS=*` to the environment variables.
 ### 🎨 Config
 
 When you open the app for the first time, it will try to use your local ollama as an LLM provider.
-If you do not have ollama or want to use any Open AI compatible LLM service, you can open the settings and configure your LLM connections there.
+If you do not have ollama or want to use any Open AI compatible LLM service, you can open the settings and configure your LLM connections there. (Note that the server has to allow cross-origin requests.)
 
-Additionally, you can configure connections to tool servers provided via the Open API standard.
-To wrap MCP servers and make them available use [MCPO from Open WebUI](https://github.com/open-webui/mcpo).
+Additionally, you can add MCP tools hosted via http. Note stdio MCPs do not work, since we are a web application.
 
 
 ## 💡 Roadmap
 
 - UX / UI
   * [ ] Settings
-    - [ ] Configure connections to LLMs
-    - [ ] Configure connections to tools
-  * [ ] Manage Chats
+    - [X] Configure connections to LLMs
+    - [%] Configure connections to tools
+      * [ ] Provide http url to MCP server + headers for login
+      * [ ] Allow declaring that a tool is in Web or RaG group
+  * [ ] Manage Chats / Conversations
     - [X] New chat
+    - [ ] Change icon for new chat
     - [X] Change model for current chat
     - [ ] Download current chat as markdown
     - [ ] Reopen old conversation
     - [ ] Delete old conversation
   * [X] Image support (allow pasting, dragging or uploading an image / screenshot)
   * [ ] Activate / deactivate tools
-    - [ ] Quick tools (Web, RaG)
-    - [ ] Other tools (via dropdown)
+    - [ ] Quick MCP tools (Web, RaG, Deep Thought = agentic loop)
+      * [ ] Button for Agentic
+    - [ ] Other MCP tools (via dropdown)
+- AI Features
+  * [ ] Agentic core loop (collect context by calling tools, aggregate answer)
+- Audio Features (far future)
   * [ ] Transcribe Audio (Speech-To-Text into chat input)
   * [ ] Read out responses (Text-To-Speech)
   * [ ] Call (transcript is sent after a pause, response is read and it listenes again for user input)
-- AI Features
-  * [ ] Agentic core loop (plan, think, tool, response, done)
-  * [ ] Built-in Web Tools
-    * [ ] Search Web (get urls + abstract)  *(if possible)*
-    * [ ] Read Web (get content of url as text)  *(if possible)*
-    * [ ] ~~Search Wikipedia (get article names + abstract)~~
-    * [ ] ~~Read Wikipedia (get wikipedia article on topic as text)~~
-    * [ ] ~~Search Paper (Arxiv, Google Scholar + abstract)~~
-    * [ ] ~~Read Paper (get arxiv paper content)~~
-  * [ ] ~~Built-in RaG Tools~~ (no built-in tools)
-    * [ ] ~~Configure WebFS connections~~
-    * [ ] ~~WebFS retriever (filename + context chunk)~~
-    * [ ] ~~WebFS file search (filename)~~
-    * [ ] ~~WebFS read file (file content)~~
-    * [ ] ~~WebFS write file (write to file with user confirmation)~~
-  * [ ] Adding tools
-    * [ ] Discover tools (given a url and header auth options) and add them to other tools
-    * [ ] Add tools to rag or web group, if they are tagged accordingly
 
 ## 👥 Contributing
 
