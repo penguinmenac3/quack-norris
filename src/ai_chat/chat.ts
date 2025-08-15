@@ -164,11 +164,12 @@ export class Chat extends Module<HTMLDivElement> {
     public update(_kwargs: KWARGS, _changedPage: boolean): void { }
 
     public async sendMessage(message: string, images: string[]) {
+        // Add the message to the chat history and start streaming the response
         this.chatHistory.addMessage(message, images)
-        // Create an empty message (that is not saved)
-        let chatMessage = this.chatHistory.addMessage("", [], this.model, false)
-
         let stream = LLMs.getInstance().chat(this.model, this.chatHistory.getMessages())
+
+        // Create message and fill it with the stream
+        let chatMessage = this.chatHistory.addMessage("", [], this.model, false)
         for await (let token of stream) {
             chatMessage.appendText(token)
         }
