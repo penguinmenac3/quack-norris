@@ -1,4 +1,4 @@
-import { LLMs } from "../utils/llms"
+import { LLMs } from "./llms"
 import { ChatMessage } from "./chatMessage"
 import { ConversationManager } from "./conversationManager"
 

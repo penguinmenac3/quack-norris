@@ -1,10 +1,10 @@
-import { iconTrash } from "../icons";
-import { ActionButton } from "../webui/components/buttons";
-import { FormHeading, FormLabel, FormInput, FormRadioButtonGroup, FormSubmit, FormVSpace } from "../webui/components/form";
-import { ExitablePopup } from "../webui/components/popup";
-import { Module } from "../webui/module";
-import { LLMs, APIType } from "./utils/llms";
-import { Tools } from "./utils/tools";
+import { iconTrash } from "../../icons";
+import { ActionButton } from "../../webui/components/buttons";
+import { FormHeading, FormLabel, FormInput, FormRadioButtonGroup, FormSubmit, FormVSpace } from "../../webui/components/form";
+import { ExitablePopup } from "../../webui/components/popup";
+import { Module } from "../../webui/module";
+import { LLMs, APIType } from "../logic/llms";
+import { Tools } from "../logic/tools";
 
 
 class RemovableItem extends Module<HTMLDivElement> {
@@ -17,7 +17,7 @@ class RemovableItem extends Module<HTMLDivElement> {
     }
 }
 
-export function settings_popup() {
+export function settingsPopup() {
     let popup = new ExitablePopup("popupContent-fullscreen");
     // LLMs
     popup.add(new FormHeading("LLM Connections"));

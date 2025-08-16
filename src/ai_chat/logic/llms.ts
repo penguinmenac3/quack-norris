@@ -1,4 +1,4 @@
-import { ChatMessage } from "../model/chatMessage"
+import { ChatMessage } from "./chatMessage"
 
 export enum APIType {
     OpenAI = "OpenAI",

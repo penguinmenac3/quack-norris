@@ -2,8 +2,8 @@ import './webui/core.css'
 import './webui/colors.css'
 import { STRINGS, setupLanguage } from './language/default'
 import { PageManager } from './webui/pagemanager'
-import { ChatView } from './ai_chat/chat'
-import { ConversationManager } from "./ai_chat/model/conversationManager"
+import { ChatView } from './ai_chat/ui/chat'
+import { ConversationManager } from "./ai_chat/logic/conversationManager"
 
 
 async function main() {

@@ -1,14 +1,14 @@
 import "./chatHistory.css"
 import "../webui/md.css"
 import * as marked from 'marked';
-import { Module } from "../webui/module";
-import { ActionButton } from "../webui/components/buttons";
-import { copyToClipboard } from "../webui/utils/copy";
-import { ConfirmCancelPopup } from "../webui/components/popup";
-import { iconAIModel, iconCopy, iconEdit, iconRefresh, iconTrash } from "../icons";
-import { Conversation, ConversationListener } from "./model/conversation";
-import { ChatMessage, ChatMessageListener } from "./model/chatMessage";
-import { ConversationManager, ConversationManagerListener } from "./model/conversationManager";
+import { Module } from "../../webui/module";
+import { ActionButton } from "../../webui/components/buttons";
+import { copyToClipboard } from "../../webui/utils/copy";
+import { ConfirmCancelPopup } from "../../webui/components/popup";
+import { iconAIModel, iconCopy, iconEdit, iconRefresh, iconTrash } from "../../icons";
+import { Conversation, ConversationListener } from "../logic/conversation";
+import { ChatMessage, ChatMessageListener } from "../logic/chatMessage";
+import { ConversationManager, ConversationManagerListener } from "../logic/conversationManager";
 
 export class EditBarComponent extends Module<HTMLDivElement> {
     public constructor(message: ChatMessage) {

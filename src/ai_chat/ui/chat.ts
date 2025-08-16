@@ -1,15 +1,15 @@
 import "./chat.css"
-import { KWARGS, Module } from "../webui/module";
+import { KWARGS, Module } from "../../webui/module";
 import { ChatInputComponent } from "./chatInput";
 import { ChatHistory } from "./chatHistory";
-import { ActionButton, DropdownButton } from "../webui/components/buttons";
-import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../icons";
-import { iconBars } from "../webui/icons";
-import { ConfirmCancelPopup } from "../webui/components/popup";
-import { LLMs } from "./utils/llms";
-import { settings_popup } from "./settings_popup";
-import { Conversation } from "./model/conversation";
-import { ConversationManager, ConversationManagerListener } from "./model/conversationManager";
+import { ActionButton, DropdownButton } from "../../webui/components/buttons";
+import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../../icons";
+import { iconBars } from "../../webui/icons";
+import { ConfirmCancelPopup } from "../../webui/components/popup";
+import { LLMs } from "../logic/llms";
+import { settingsPopup } from "./settingsPopup";
+import { Conversation } from "../logic/conversation";
+import { ConversationManager, ConversationManagerListener } from "../logic/conversationManager";
 
 export class ChatView extends Module<HTMLDivElement> {
     private llm: DropdownButton
@@ -69,7 +69,7 @@ export class ChatView extends Module<HTMLDivElement> {
         }
 
         settings.onAction = () => {
-            settings_popup();
+            settingsPopup();
         }
 
         let listener = new ConversationManagerListener()

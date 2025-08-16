@@ -1,11 +1,11 @@
 import "./chatInput.css"
-import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook, iconTrash } from "../icons";
-import { Module } from "../webui/module";
-import { ActionButton } from "../webui/components/buttons";
-import { ExitablePopup } from "../webui/components/popup";
-import { FormInput, FormSubmit } from "../webui/components/form";
-import { Conversation, ConversationListener } from "./model/conversation";
-import { ConversationManager, ConversationManagerListener } from "./model/conversationManager";
+import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook, iconTrash } from "../../icons";
+import { Module } from "../../webui/module";
+import { ActionButton } from "../../webui/components/buttons";
+import { ExitablePopup } from "../../webui/components/popup";
+import { FormInput, FormSubmit } from "../../webui/components/form";
+import { Conversation, ConversationListener } from "../logic/conversation";
+import { ConversationManager, ConversationManagerListener } from "../logic/conversationManager";
 
 export class ChatInputComponent extends Module<HTMLDivElement> {
     private input: Module<HTMLTextAreaElement>
