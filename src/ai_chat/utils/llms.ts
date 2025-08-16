@@ -1,12 +1,8 @@
+import { ChatMessage } from "../model/chatMessage"
+
 export enum APIType {
     OpenAI = "OpenAI",
     AzureOpenAI = "AzureOpenAI"
-}
-
-export interface IChatMessage {
-    getText(): string
-    getImages(): string[]
-    getRole(): string
 }
 
 interface APIConnection {
@@ -84,7 +80,7 @@ export class LLMs {
         return models.sort()
     }
 
-    public async* chat(model: string, history: IChatMessage[]): AsyncGenerator<string, void> {
+    public async* chat(model: string, messages: ChatMessage[]): AsyncGenerator<string, void> {
         let [connectionName, modelName] = model.split("/")
         let connection = this.connections.get(connectionName)
         if (!connection) {
@@ -93,8 +89,8 @@ export class LLMs {
         }
 
         if (connection.type == APIType.OpenAI) {
-            let messages = []
-            for (let message of history) {
+            let history = []
+            for (let message of messages) {
                 let content: any[] = [{
                     "type": "text",
                     "text": message.getText()
@@ -105,8 +101,12 @@ export class LLMs {
                         "image_url": { "url": image }
                     })
                 }
-                messages.push({
-                    "role": message.getRole(),
+                let role = message.getRole()
+                if (role != "user" && role != "system") {
+                    role = "assistant"
+                }
+                history.push({
+                    "role": role,
                     "content": content
                 })
             }
@@ -121,7 +121,7 @@ export class LLMs {
                     },
                     body: JSON.stringify({
                         model: modelName,
-                        messages: messages,
+                        messages: history,
                         stream: true,
                     }),
                 });

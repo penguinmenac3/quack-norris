@@ -1,6 +1,6 @@
 import "./chat.css"
 import { KWARGS, Module } from "../webui/module";
-import { ChatInput } from "./chatInput";
+import { ChatInputComponent } from "./chatInput";
 import { ChatHistory } from "./chatHistory";
 import { ActionButton, DropdownButton } from "../webui/components/buttons";
 import { iconAIModel, iconDropdown, iconSettings, iconTrash } from "../icons";
@@ -8,12 +8,11 @@ import { iconBars } from "../webui/icons";
 import { ConfirmCancelPopup } from "../webui/components/popup";
 import { LLMs } from "./utils/llms";
 import { settings_popup } from "./settings_popup";
+import { Conversation } from "./model/conversation";
+import { ConversationManager, ConversationManagerListener } from "./model/conversationManager";
 
-export class Chat extends Module<HTMLDivElement> {
-    public chatHistory: ChatHistory
-    public chatInput: ChatInput
+export class ChatView extends Module<HTMLDivElement> {
     private llm: DropdownButton
-    private model: string = "loading..."
     
     public constructor() {
         super("div", "", "chat")
@@ -23,36 +22,26 @@ export class Chat extends Module<HTMLDivElement> {
         let newConversation = new ActionButton(iconTrash)
         header.add(newConversation)
         let quick_settings = new Module<HTMLSpanElement>("span", "", "fill-width")
-        this.llm = new DropdownButton(iconAIModel + " " + this.model + " " + iconDropdown, null, true)
+        this.llm = new DropdownButton(iconAIModel + " loading... " + iconDropdown, null, true)
+        let conversation = ConversationManager.getCurrentConversation()
+        if (conversation) {
+            this.setModel(conversation.getModel())
+        }
         this.llm.onAction = async () => {
             let models = await LLMs.getInstance().getModels()
             let actions = new Map<string, CallableFunction>()
             for (let model of models) {
                 actions.set(model, () => {
-                    this.model = model
-                    localStorage["quack-norris-model"] = this.model
-                    this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
+                    let conversation = ConversationManager.getCurrentConversation()
+                    if (conversation) {
+                        conversation.setModel(model)
+                        this.setModel(model)
+                    }
                     return true
                 })
             }
             this.llm.showMenu(actions)
         }
-        window.setTimeout(async () => {
-            let models = await LLMs.getInstance().getModels()
-            if (localStorage["quack-norris-model"]) {
-                this.model = localStorage["quack-norris-model"]
-            }
-            // If the model does not exist, just take the first
-            if (!models.includes(this.model)) {
-                if (models[0]) {
-                    this.model = models[0]
-                    localStorage["quack-norris-model"] = this.model
-                } else {
-                    this.model = "(no model found)"
-                }
-            }
-            this.llm.htmlElement.innerHTML = iconAIModel + " " + this.model + " " + iconDropdown
-        }, 100)
         quick_settings.add(this.llm)
         //let role = new DropdownButton(iconRoles + " General " + iconDropdown)
         // let roles = new Map<string, CallableFunction>()
@@ -62,17 +51,19 @@ export class Chat extends Module<HTMLDivElement> {
         header.add(quick_settings)
         let settings = new ActionButton(iconSettings)
         header.add(settings)
-        this.add(header)
-        this.chatHistory = new ChatHistory()
-        this.add(this.chatHistory)
-        this.chatInput = new ChatInput()
-        this.add(this.chatInput)
-
+        this.add(header) 
+        this.add(new ChatHistory())
+        this.add(new ChatInputComponent())
 
         newConversation.onAction = () => {
             let popup = new ConfirmCancelPopup("Are you sure? (Will delete the entire conversation history)", "Yes", "Cancel")
             popup.onConfirm = () => {
-                this.newConversation()
+                // FIXME replace with creation of new conversation once we have a conversation list viewer
+                //ConversationManager.newConversation()
+                let conversation = ConversationManager.getCurrentConversation()
+                if (conversation) {
+                    conversation.deleteMessages(conversation.getMessages()[0])
+                }
             }
             popup.onCancel = () => { }
         }
@@ -80,26 +71,17 @@ export class Chat extends Module<HTMLDivElement> {
         settings.onAction = () => {
             settings_popup();
         }
+
+        let listener = new ConversationManagerListener()
+        listener.onConversationSelected = (_id: string, conversation: Conversation) => {
+            this.setModel(conversation.getModel())
+        }
+        ConversationManager.addListener(listener)
+    }
+
+    private setModel(model: string): void {
+        this.llm.htmlElement.innerHTML = iconAIModel + " " + model + " " + iconDropdown
     }
 
     public update(_kwargs: KWARGS, _changedPage: boolean): void { }
-
-    public async sendMessage(message: string, images: string[]) {
-        // Add the message to the chat history and start streaming the response
-        this.chatHistory.addMessage(message, images)
-        let stream = LLMs.getInstance().chat(this.model, this.chatHistory.getMessages())
-
-        // Create message and fill it with the stream
-        let chatMessage = this.chatHistory.addMessage("", [], this.model, false)
-        for await (let token of stream) {
-            chatMessage.appendText(token)
-        }
-
-        // When streaming completed, save the chat history again
-        this.chatHistory.saveMessages()
-    }
-
-    public newConversation() {
-        this.chatHistory.clear()
-    }
 }

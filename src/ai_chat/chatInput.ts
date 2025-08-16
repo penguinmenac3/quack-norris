@@ -1,12 +1,13 @@
 import "./chatInput.css"
 import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook, iconTrash } from "../icons";
 import { Module } from "../webui/module";
-import { Chat } from "./chat";
 import { ActionButton } from "../webui/components/buttons";
 import { ExitablePopup } from "../webui/components/popup";
 import { FormInput, FormSubmit } from "../webui/components/form";
+import { Conversation, ConversationListener } from "./model/conversation";
+import { ConversationManager, ConversationManagerListener } from "./model/conversationManager";
 
-export class ChatInput extends Module<HTMLDivElement> {
+export class ChatInputComponent extends Module<HTMLDivElement> {
     private input: Module<HTMLTextAreaElement>
     private send: ActionButton
     private call: ActionButton
@@ -59,18 +60,20 @@ export class ChatInput extends Module<HTMLDivElement> {
         }
 
         this.send.onAction = () => {
+            let conversation = ConversationManager.getCurrentConversation()
+            if (!conversation) return
             let text = this.input.htmlElement.value
             let images: string[] = []
-            let chat = this.parent! as Chat
             for (let module of media.getChildren()) {
-                let image = module as InputImage
+                let image = module as InputImageComponent
                 images.push(image.getImageURL())
             }
             media.removeChildren()
             media.hide()
-            chat.sendMessage(text, images)
+            conversation.sendMessage(text, images)
             this.input.htmlElement.value = ""
             this.onUpdateInput()
+            conversation.setDraftText(this.input.htmlElement.value)
         }
 
         this.input.htmlElement.addEventListener('paste', async (e) => {
@@ -147,7 +150,7 @@ export class ChatInput extends Module<HTMLDivElement> {
             reader.readAsDataURL(blob)
             reader.onloadend = function () {
                 var base64data = "" + reader.result
-                let image = new InputImage(base64data)
+                let image = new InputImageComponent(base64data)
                 image.onRemove = () => {
                     media.remove(image)
                     if (media.getChildren().length == 0) {
@@ -158,6 +161,25 @@ export class ChatInput extends Module<HTMLDivElement> {
                 media.show()
             }
         }
+
+        let conversation = ConversationManager.getCurrentConversation()
+        if (conversation)
+            this.registerConversationListener(conversation)
+        let listener = new ConversationManagerListener()
+        listener.onConversationSelected = (_id: string, conversation: Conversation) => {
+            this.registerConversationListener(conversation);
+        }
+    }
+
+    private registerConversationListener(conversation: Conversation) {
+        let conversationListener = new ConversationListener();
+        conversationListener.onDraftChanged = (draft_text: string, _draft_images: string[]) => {
+            console.log(draft_text);
+            this.input.htmlElement.value = draft_text;
+            this.onUpdateInput();
+            // TODO handle storing of images correctly
+        };
+        conversation.addListener(conversationListener);
     }
 
     private onUpdateInput() {
@@ -177,15 +199,10 @@ export class ChatInput extends Module<HTMLDivElement> {
         }
         this.input.htmlElement.style.height = "" + height + "px"
     }
-
-    public setInputText(text: string) {
-        this.input.htmlElement.value = text
-        this.onUpdateInput()
-    }
 }
 
 
-class InputImage extends Module<HTMLImageElement> {
+class InputImageComponent extends Module<HTMLImageElement> {
     public constructor(private base64data: string) {
         super("div", "", "image")
         let image = new Module<HTMLImageElement>("img")
