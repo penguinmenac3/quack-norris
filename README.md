@@ -6,6 +6,8 @@ Are you tired of spending hours ⏳ debugging your code? Look no further! Quack 
 
 **Agentic AI Core**: Experience agentic AI using any language model provider through this UI. This innovative platform allows tools and retrieval-augmented generation (RAG) functionalities to be used with ease. 🤖💬
 
+![agentic-core-visualization](./docs/agent.excalidraw.svg)
+
 ## 👨‍💻 Usage 
 
 Visit https://penguinmenac3.github.io/quack-norris/ and install it as a web app.
@@ -75,6 +77,12 @@ git commit -m "Build gh-pages."
 git push
 git subtree push --prefix dist origin gh-pages
 ```
+
+### Software Architecture
+
+The software architecture is documented in this excalidraw.
+
+![software-architecture](./docs/architecture.excalidraw.svg)
 
 ## ⚖️ License
 
