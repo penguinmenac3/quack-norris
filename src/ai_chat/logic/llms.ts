@@ -80,7 +80,43 @@ export class LLMs {
         return models.sort()
     }
 
-    public async* chat(model: string, messages: ChatMessage[]): AsyncGenerator<string, void> {
+    public async chat(model: string, messages: ChatMessage[]): Promise<string> {
+        let [connectionName, modelName] = model.split("/")
+        let connection = this.connections.get(connectionName)
+        if (!connection) {
+            return "ERROR: The model '" + model + "' is unavailable. Check your llm connections."
+        }
+
+        if (connection.type == APIType.OpenAI) {
+            let history = this.messagesToOpenAIFormat(messages)
+
+            // Return the message content
+            try {
+                const response = await fetch(connection.apiEndpoint + "/chat/completions", {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${connection.apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: history,
+                        stream: false,
+                    }),
+                });
+                let data = await response.json()
+                return data.choices[0].message.content
+            } catch {
+                return "\n\nERROR: Failed to retrieve answer from the LLM."
+            }
+        } else if (connection.type == APIType.AzureOpenAI) {
+            return "ERROR: AzureOpenAI chat endpoint not implemented yet!"
+        } else {
+            return "ERROR: Unsupported chat API type!"
+        }
+    }
+
+    public async* stream(model: string, messages: ChatMessage[]): AsyncGenerator<string, void> {
         let [connectionName, modelName] = model.split("/")
         let connection = this.connections.get(connectionName)
         if (!connection) {
@@ -89,27 +125,7 @@ export class LLMs {
         }
 
         if (connection.type == APIType.OpenAI) {
-            let history = []
-            for (let message of messages) {
-                let content: any[] = [{
-                    "type": "text",
-                    "text": message.getText()
-                }]
-                for (let image of message.getImages()) {
-                    content.push({
-                        "type": "image_url",
-                        "image_url": { "url": image }
-                    })
-                }
-                let role = message.getRole()
-                if (role != "user" && role != "system") {
-                    role = "assistant"
-                }
-                history.push({
-                    "role": role,
-                    "content": content
-                })
-            }
+            let history = this.messagesToOpenAIFormat(messages)
 
             // Stream in the result into the message entity
             try {
@@ -150,6 +166,31 @@ export class LLMs {
         } else {
             yield "ERROR: Unsupported chat API type!"
         }
+    }
+
+    private messagesToOpenAIFormat(messages: ChatMessage[]) {
+        let history = []
+        for (let message of messages) {
+            let content: any[] = [{
+                "type": "text",
+                "text": message.getText()
+            }]
+            for (let image of message.getImages()) {
+                content.push({
+                    "type": "image_url",
+                    "image_url": { "url": image }
+                })
+            }
+            let role = message.getRole()
+            if (role != "user" && role != "system") {
+                role = "assistant"
+            }
+            history.push({
+                "role": role,
+                "content": content
+            })
+        }
+        return history
     }
 
     public async embed(model: string, _text: string) {

@@ -1,6 +1,6 @@
-import { LLMs } from "./llms"
 import { ChatMessage } from "./chatMessage"
 import { ConversationManager } from "./conversationManager"
+import { Agent } from "./agent"
 
 
 export class ConversationListener {
@@ -108,7 +108,7 @@ export class Conversation {
         // Add the message to the chat history and start streaming the response
         this.addMessage(new ChatMessage(message, images, "user"))
         let messagesCopy = this.getMessages().slice()
-        let stream = LLMs.getInstance().chat(this.model, messagesCopy)
+        let stream = Agent.getInstance().chat(this.model, messagesCopy, this.settings)
 
         // Create message and fill it with the stream
         let chatMessage = new ChatMessage("", [], this.model)
