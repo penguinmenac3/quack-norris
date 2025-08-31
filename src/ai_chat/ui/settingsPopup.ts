@@ -76,7 +76,7 @@ export function settingsPopup() {
     popup.add(addLLM);
     // Tools
     popup.add(new FormVSpace("3em"));
-    popup.add(new FormHeading("Tool Connections"));
+    popup.add(new FormHeading("MCP Servers"));
     let tools = Tools.getInstance().getConnections();
     for (let connection of tools) {
         popup.add(new RemovableItem(
@@ -84,14 +84,14 @@ export function settingsPopup() {
             () => { Tools.getInstance().removeConnection(connection); }
         ));
     }
-    popup.add(new FormHeading("Add Tool Server", "h2"));
-    popup.add(new FormLabel("toolEndpoint"));
-    let toolEndpoint = new FormInput("toolEndpoint", "https://localhost:1337", "text");
+    popup.add(new FormHeading("Add MCP Server", "h2"));
+    popup.add(new FormLabel("http URL"));
+    let toolEndpoint = new FormInput("mcpURL", "https://localhost:13374/mcp", "text");
     popup.add(toolEndpoint);
-    popup.add(new FormLabel("toolKey"));
-    let toolKey = new FormInput("toolKey", "f5a20...", "password");
+    popup.add(new FormLabel("header"));
+    let toolKey = new FormInput("mcpHeader", "{'bearer': 'f5a20...'}", "textarea");
     popup.add(toolKey);
-    let addTool = new FormSubmit("Add Tool Server", "buttonWide");
+    let addTool = new FormSubmit("Add MCP Server", "buttonWide");
     addTool.onClick = () => {
         Tools.getInstance().addConnection(toolEndpoint.value(), toolKey.value());
         popup.dispose();
