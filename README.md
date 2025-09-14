@@ -67,15 +67,15 @@ The rules for AI will also apply to human contributors.
 
 ### Building the Chat-UI
 
-Run the build command, add and commit the dist folder and then push this folger to gh-pages.
+Run the build command, add and commit the quack_ui/dist folder and then push this folger to gh-pages.
 
 ```
 npm run build
-rm dist/favicon.kra
-git add -f dist
+rm quack_ui/dist/favicon.kra
+git add -f quack_ui/dist
 git commit -m "Build gh-pages."
 git push
-git subtree push --prefix dist origin gh-pages
+git subtree push --prefix quack_ui/dist origin gh-pages
 ```
 
 ### Software Architecture
