@@ -2,7 +2,7 @@ from typing import Literal
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport, SSETransport, StdioTransport
 
-from quack_norris.core.agent import Tool
+from quack_norris.core.llm import Tool
 
 
 class MCPClient:

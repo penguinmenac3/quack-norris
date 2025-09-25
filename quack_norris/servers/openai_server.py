@@ -1,5 +1,5 @@
 from time import time
-from typing import List, Optional
+from typing import List, Optional, Protocol
 from uuid import uuid4
 import asyncio
 import json
@@ -13,8 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 import uvicorn
 
-from quack_norris.micro_graph import Node
-from quack_norris.core.state import build_agent_state
 from quack_norris.core.llm import ChatMessage
 from quack_norris.core.output_writer import OutputWriter
 
@@ -26,7 +24,11 @@ class ChatCompletionRequest(BaseModel):
     stream: Optional[bool] = False
 
 
-def create_openai_api(chat_agents: dict[str, Node], debug=False) -> FastAPI:
+class ChatHandler(Protocol):
+    async def __call__(self, history: list[ChatMessage], output: OutputWriter) -> None: ...
+
+
+def create_openai_api(handlers: dict[str, ChatHandler], debug=False) -> FastAPI:
     app = FastAPI(title="OpenAI Server")
 
     # Set up logging
@@ -80,10 +82,9 @@ def create_openai_api(chat_agents: dict[str, Node], debug=False) -> FastAPI:
 
                 # Run the graph in a background task
                 async def run_graph():
-                    writer = OutputWriter(queue=queue)
-                    shared = build_agent_state(chat_messages=request.messages, writer=writer)
-                    await chat_agents[request.model].start(shared)
-                    await writer.clear()
+                    output = OutputWriter(queue=queue)
+                    await handlers[request.model](history=request.messages, output=output)
+                    await output.clear()
                     await queue.put(None)  # Sentinel to signal completion
 
                 asyncio.create_task(run_graph())
@@ -140,7 +141,7 @@ def create_openai_api(chat_agents: dict[str, Node], debug=False) -> FastAPI:
                     "created": time(),
                     "owned_by": "micro-graph",
                 }
-                for model in chat_agents.keys()
+                for model in handlers.keys()
             ],
         }
         if debug:
@@ -159,10 +160,10 @@ def create_openai_api(chat_agents: dict[str, Node], debug=False) -> FastAPI:
 
 
 def serve_openai_api(
-    chat_agents: dict[str, Node],
+    handlers: dict[str, ChatHandler],
     host: str = "localhost",
     port: int = 8000,
     debug=False,
 ):
-    app = create_openai_api(chat_agents, debug=debug)
+    app = create_openai_api(handlers, debug=debug)
     uvicorn.run(app, host=host, port=port)

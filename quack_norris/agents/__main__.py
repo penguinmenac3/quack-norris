@@ -2,13 +2,20 @@ import asyncio
 import dotenv
 import os
 import json
-from quack_norris.core import Agent, LLM, MCPClient
+from quack_norris.core import (
+    LLM,
+    MCPClient,
+    ChatMessage,
+    OutputWriter,
+)
+from quack_norris.agents.agent_definition import AgentDefinition
+from quack_norris.agents.agent_runner import AgentRunner
 from quack_norris.servers import serve_openai_api
 
 
 def main(work_dir=os.path.dirname(__file__)):
     # Setup
-    agents: dict[str, Agent] = {}
+    agents: dict[str, AgentDefinition] = {}
     tools = []
     dotenv.load_dotenv()
     llm, model = LLM.from_env()
@@ -37,25 +44,29 @@ def main(work_dir=os.path.dirname(__file__)):
     # Load agents from md files in all subdirectories
     for root, _, files in os.walk(work_dir):
         for fname in files:
-            if fname.endswith(".md"):
-                if fname.endswith("README.md"):
-                    continue
+            if fname.endswith(".agent.md"):
                 file_path = os.path.join(root, fname)
-                with open(file_path, "r", encoding="utf-8") as f:
-                    md = f.read()
                 try:
-                    agent = Agent(llm, model, md, no_think=True)
+                    agent = AgentDefinition.from_file(file_path)
                     agents[agent.name] = agent
                 except Exception as e:
                     print(f"WARNING: Failed to load agent `{fname}` for reason {e}")
 
-    # Set the tools and agents as tools for other agents
-    for name, agent in agents.items():
-        agents_as_tools = [a.as_tool() for a in agents.values() if a is not agent]
-        agent.set_tools(tools + agents_as_tools)
+    runner = AgentRunner(
+        llm=llm, model=model, default_agent="auto", agents=agents, tools=tools
+    )
 
     # Serve agents via chat api
-    serve_openai_api({k: v for k, v in agents.items()})
+    def _make_handler(agent):
+        if agent == runner._default_agent:
+            agent = ""
+
+        def _handle_chat(history: list[ChatMessage], output: OutputWriter):
+            return runner.process_request(agent_name=agent, history=history, output=output)
+
+        return _handle_chat
+
+    serve_openai_api(handlers={k: _make_handler(k) for k in agents.keys()})
 
 
 if __name__ == "__main__":
