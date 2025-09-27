@@ -45,8 +45,8 @@ def main(work_dir=None):
             try:
                 client = MCPClient(**config)
                 tools += asyncio.run(client.list_tools(prefix=f"{name}."))
-            except:
-                print(f"WARNING: Failed to set up MCP `{name}`")
+            except Exception as e:
+                print(f"WARNING: Failed to set up MCP `{name}` with error `{e}`")
 
         print("MCP Tools Discovered")
         for tool in tools:
