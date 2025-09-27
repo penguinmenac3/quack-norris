@@ -2,6 +2,7 @@ import asyncio
 import dotenv
 import os
 import json
+import shutil
 from quack_norris.core import (
     LLM,
     MCPClient,
@@ -13,36 +14,61 @@ from quack_norris.agents.agent_runner import AgentRunner
 from quack_norris.servers import serve_openai_api
 
 
-def main(work_dir=os.path.dirname(__file__)):
+def main(work_dir=None):
     # Setup
+    print("Loading environment and llm")
     agents: dict[str, AgentDefinition] = {}
     tools = []
     dotenv.load_dotenv()
     llm, model = LLM.from_env()
 
-    # load tools from MCP servers
-    with open(os.path.join(work_dir, "mcps.json"), "r") as f:
-        mcps = json.load(f)["servers"]
-    for name, config in mcps.items():
-        name = (
-            name.replace("-", "_")
-            .replace("/", "_")
-            .replace(".", "_")
-            .replace("(", "_")
-            .replace(")", "_")
-        )
-        try:
-            client = MCPClient(**config)
-            tools += asyncio.run(client.list_tools(prefix=f"{name}."))
-        except:
-            print(f"WARNING: Failed to set up MCP `{name}`")
+    # Define paths
+    if work_dir is None:
+        home = os.path.expanduser("~")
+        work_dir = os.path.join(home, ".config/quack-norris")
+    mcp_path = os.path.join(work_dir, "mcps.json")
+    agents_path = os.path.join(work_dir, "agents")
 
-    print("MCP Tools Discovered")
-    for tool in tools:
-        print(f"* {tool.name}: {tool.description}")
+    # load tools from MCP servers
+    if os.path.exists(mcp_path):
+        print("Loading and connecting MCP tools")
+        with open(mcp_path, "r") as f:
+            mcps = json.load(f)["servers"]
+        for name, config in mcps.items():
+            name = (
+                name.replace("-", "_")
+                .replace("/", "_")
+                .replace(".", "_")
+                .replace("(", "_")
+                .replace(")", "_")
+            )
+            try:
+                client = MCPClient(**config)
+                tools += asyncio.run(client.list_tools(prefix=f"{name}."))
+            except:
+                print(f"WARNING: Failed to set up MCP `{name}`")
+
+        print("MCP Tools Discovered")
+        for tool in tools:
+            print(f"* {tool.name}: {tool.description}")
+    else:
+        print(f"No MCP servers configured. Create a `{work_dir}/mcps.json` to configure them.")
+
+    # Check if default agent exists, if not use the default.auto.agent.md to create it
+    here = os.path.dirname(__file__)
+    default_agent_src = os.path.join(here, "default.auto.agent.md")
+    default_agent_dst = os.path.join(agents_path, "auto.agent.md")
+    if not os.path.exists(default_agent_dst):
+        os.makedirs(agents_path, exist_ok=True)
+        if os.path.exists(default_agent_src):
+            shutil.copyfile(default_agent_src, default_agent_dst)
+            print(f"Copied default agent to {default_agent_dst}")
+        else:
+            print(f"WARNING: Default agent file not found at {default_agent_src}")
 
     # Load agents from md files in all subdirectories
-    for root, _, files in os.walk(work_dir):
+    print("Loading agent definitions")
+    for root, _, files in os.walk(agents_path):
         for fname in files:
             if fname.endswith(".agent.md"):
                 file_path = os.path.join(root, fname)
@@ -66,6 +92,7 @@ def main(work_dir=os.path.dirname(__file__)):
 
         return _handle_chat
 
+    print("Starting server")
     serve_openai_api(handlers={k: _make_handler(k) for k in agents.keys()})
 
 
