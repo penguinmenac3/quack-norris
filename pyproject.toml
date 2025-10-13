@@ -28,8 +28,7 @@ dev = [
 ]
 
 [project.scripts]
-quack-norris-agents = "quack_norris.agents.__main__:main"
-quack-norris-proxy = "quack_norris.servers.llm_proxy:main"
+quack-norris = "quack_norris.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

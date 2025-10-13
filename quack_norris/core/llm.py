@@ -1,6 +1,5 @@
 from typing import Any, Callable, Generator, Optional, TypedDict
 import requests
-import os
 import re
 import json
 
@@ -127,12 +126,10 @@ class ConnectionSpec(TypedDict):
 
 class LLM(object):
     @staticmethod
-    def from_config(work_dir: str | None = None, fname: str = "llms.json") -> "LLM":
-        if work_dir is None:
-            home = os.path.expanduser("~")
-            work_dir = os.path.join(home, ".config/quack-norris")
-        llms_path = os.path.join(work_dir, fname)
-        if not os.path.exists(llms_path):
+    def from_config(config: dict[str, dict[str, ConnectionSpec]]) -> "LLM":
+        if "llms" in config:
+            connections = config["llms"]
+        else:
             connections = {
                 "Ollama": ConnectionSpec(
                     api_endpoint="http://localhost:11434",
@@ -141,9 +138,6 @@ class LLM(object):
                     model="AUTODETECT",
                 ),
             }
-        else:
-            with open(llms_path, "r") as f:
-                connections = json.load(f)
 
         return LLM(connections=connections)
 
@@ -151,6 +145,7 @@ class LLM(object):
         self._llms = {}
         self._mapped_names = {}
         for name, conn in connections.items():
+            print(f"Connecting LLM: {name}")
             self._add_connection(**conn, model_display_name=name)
 
     def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str, model_display_name: str):

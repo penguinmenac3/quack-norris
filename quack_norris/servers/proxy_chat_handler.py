@@ -1,3 +1,4 @@
+from typing import Any
 import traceback
 
 from quack_norris.core import (
@@ -5,13 +6,13 @@ from quack_norris.core import (
     ChatMessage,
     OutputWriter,
 )
-from quack_norris.servers import serve_openai_api
+from quack_norris.servers.openai_server import ChatHandler
 
 
-def main(work_dir=None):
-    # Setup
-    print("Loading environment and llm")
-    llm = LLM.from_config(work_dir=work_dir, fname="proxy.json")
+def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandler]:
+    if "proxy" not in config:
+        print("WARNING: No proxy configuration found in config, no models will be proxied.")
+        return {}
 
     # Serve agents via chat api
     def _make_handler(model_name: str):
@@ -45,13 +46,4 @@ def main(work_dir=None):
                 await output.write("ERROR: The selected LLM has an error. Please try again later and contact the admin if the error persists.", clean=False)
 
         return _handle_chat
-
-    print("Starting server")
-    serve_openai_api(
-        handlers={k: _make_handler(k) for k in llm.get_models()},
-        port=11435,
-    )
-
-
-if __name__ == "__main__":
-    main()
+    return {k: _make_handler(k) for k in llm.get_models() if k in config["proxy"]}
