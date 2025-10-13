@@ -15,19 +15,18 @@ from quack_norris.servers import serve_openai_api
 
 
 def main(work_dir=None):
-    # Setup
-    print("Loading environment and llm")
-    agents: dict[str, AgentDefinition] = {}
-    tools = []
-    dotenv.load_dotenv()
-    llm, model = LLM.from_env()
-
     # Define paths
     if work_dir is None:
         home = os.path.expanduser("~")
         work_dir = os.path.join(home, ".config/quack-norris")
     mcp_path = os.path.join(work_dir, "mcps.json")
     agents_path = os.path.join(work_dir, "agents")
+    
+    # Setup
+    print("Loading environment and llm")
+    agents: dict[str, AgentDefinition] = {}
+    tools = []
+    llm = LLM.from_config(work_dir=work_dir)
 
     # load tools from MCP servers
     if os.path.exists(mcp_path):
@@ -79,7 +78,7 @@ def main(work_dir=None):
                     print(f"WARNING: Failed to load agent `{fname}` for reason {e}")
 
     runner = AgentRunner(
-        llm=llm, model=model, default_agent="auto", agents=agents, tools=tools
+        llm=llm, default_agent="auto", agents=agents, tools=tools
     )
 
     # Serve agents via chat api

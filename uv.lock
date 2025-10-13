@@ -1195,7 +1195,7 @@ wheels = [
 [[package]]
 name = "quack-norris"
 version = "0.3.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "dotenv" },
     { name = "fastapi" },

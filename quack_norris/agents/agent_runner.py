@@ -1,23 +1,22 @@
+import os
+import datetime
+import dotenv
+
 from quack_norris.agents.agent_definition import AgentDefinition
 from quack_norris.core.llm import LLM, ChatMessage, Tool, ToolCall
 from quack_norris.core.output_writer import OutputWriter
-
-
-import datetime
 
 
 class AgentRunner:
     def __init__(
         self,
         llm: LLM,
-        model: str,
         default_agent: str,
         agents: dict[str, AgentDefinition],
         tools: list[Tool],
         max_steps: int = 5,
     ):
         self._llm = llm
-        self._model = model
         self._default_agent = default_agent
         self._agents = agents
         self._tools = tools
@@ -62,6 +61,12 @@ class AgentRunner:
             agent_name = self._determine_agent(history, agent_name)
             tools += [agent._as_tool(_switch_tool(key)) for key, agent in self._agents.items()]
 
+        dotenv.load_dotenv()
+        default_model = os.environ.get("MODEL", "AUTODETECT")
+        if default_model == "AUTODETECT":
+            default_model = os.environ.get("DEFAULT_MODEL", "gemma3:12b")
+        is_system_prompt_last = os.environ.get("SYSTEM_PROMPT_LAST", False) in [True, "true", "1", "yes", "on"]
+
         shared = {"chat_messages": history, "agent": agent_name, "task": ""}
         for step in range(max(self._max_steps, 1)):
             # Prepare the system prompt
@@ -84,12 +89,12 @@ class AgentRunner:
 
             # Send request to LLM
             response = self._llm.chat_stream(
-                model=self._model,
+                model=agent.model if agent.model != "" else default_model,
                 messages=shared["chat_messages"][-10:], # only pass last 10 messages to AI
                 tools=current_tools if step < self._max_steps - 1 else [],
                 system_prompt=system_prompt,
                 no_think=agent.no_think,
-                system_prompt_last=False,
+                system_prompt_last=agent.system_prompt_last if agent.model != "" else is_system_prompt_last,
             )
 
             # Stream the response

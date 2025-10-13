@@ -1,4 +1,4 @@
-from typing import Any, Callable, Generator, Optional
+from typing import Any, Callable, Generator, Optional, TypedDict
 import requests
 import os
 import re
@@ -85,7 +85,7 @@ class LLMStreamingResponse(object):
                             is_thinking = True
                         if word == "</think>":
                             is_thinking = False
-                        if not is_thinking and word == "[CALL]":
+                        if not is_thinking and word == "[CALL]" and len(self._tools) > 0:
                             is_tool_call = True
                             word = ""
                         if word != "":
@@ -118,26 +118,42 @@ class LLMStreamingResponse(object):
         return self._raw_text.strip()
 
 
+class ConnectionSpec(TypedDict):
+        api_endpoint: str
+        api_key: str
+        provider: str  # "openai", "AzureOpenAI", "ollama"
+        model: str  # model name or "AUTODETECT"
+
+
 class LLM(object):
     @staticmethod
-    def from_env() -> tuple["LLM", str]:
-        llm = LLM(
-            api_endpoint=os.environ.get("API_ENDPOINT", "http://localhost:11434"),
-            api_key=os.environ.get("API_KEY", "ollama"),
-            provider=os.environ.get("PROVIDER", "ollama"),
-            model=os.environ.get("MODEL", "AUTODETECT"),
-        )
-        model = os.environ.get("MODEL", "gemma3:12b")
-        return llm, model
+    def from_config(work_dir: str | None = None, fname: str = "llms.json") -> "LLM":
+        if work_dir is None:
+            home = os.path.expanduser("~")
+            work_dir = os.path.join(home, ".config/quack-norris")
+        llms_path = os.path.join(work_dir, fname)
+        if not os.path.exists(llms_path):
+            connections = {
+                "Ollama": ConnectionSpec(
+                    api_endpoint="http://localhost:11434",
+                    api_key="ollama",
+                    provider="ollama",
+                    model="AUTODETECT",
+                ),
+            }
+        else:
+            with open(llms_path, "r") as f:
+                connections = json.load(f)
 
-    def __init__(
-        self,
-        api_endpoint: str,
-        api_key: str,
-        provider: str = "OpenAI",
-        model: str = "AUTODETECT",
-    ):
+        return LLM(connections=connections)
+
+    def __init__(self, connections: dict[str, ConnectionSpec]):
         self._llms = {}
+        self._mapped_names = {}
+        for name, conn in connections.items():
+            self._add_connection(**conn, model_display_name=name)
+
+    def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str, model_display_name: str):
         if provider == "ollama":
             if model == "AUTODETECT":
                 modelListEndpoint = api_endpoint + "/api/tags"
@@ -153,11 +169,13 @@ class LLM(object):
             if model == "AUTODETECT":
                 raise ValueError("Model must be specified when not using ollama provider.")
             if provider == "AzureOpenAI":
-                self._llms[model] = _AzureAPI(
+                self._llms[model_display_name] = _AzureAPI(
                     api_version="2024-10-21", base_url=api_endpoint, api_key=api_key
                 )
+                self._mapped_names[model_display_name] = model
             else:
-                self._llms[model] = _OpenAIAPI(base_url=api_endpoint, api_key=api_key)
+                self._llms[model_display_name] = _OpenAIAPI(base_url=api_endpoint, api_key=api_key)
+                self._mapped_names[model_display_name] = model
 
     def embeddings(self, model: str, input: str | list[str]) -> list[list[float]]:
         response = self._llms[model].embeddings.create(input=input, model=model)
@@ -167,7 +185,7 @@ class LLM(object):
         self,
         model: str,
         messages: list[ChatMessage],
-        max_tokens: int = -1,
+        max_tokens: int = 16384,
         remove_thoughts=True,
         tools: list[Tool] = [],
         tool_calling_prompt: str = TOOL_CALLING_PROMPT,
@@ -186,17 +204,21 @@ class LLM(object):
                     messages = messages + [ChatMessage(role="system", content=system_prompt)]
                 else:
                     messages = [ChatMessage(role="system", content=system_prompt)] + messages
+            
+            actual_model = self._mapped_names[model] if model in self._mapped_names else model
             response = self._llms[model].chat.completions.create(
-                model=model, messages=messages, max_tokens=max_tokens, stream=False
+                model=actual_model, messages=messages, max_tokens=max_tokens, stream=False
             )
         except openai.NotFoundError as e:
             raise RuntimeError(str(e))
+        if isinstance(response, list):
+            response = response[0]
         if response.choices[0].finish_reason == "error":
             raise RuntimeError(response.choices[0].message.content)
         response_str = response.choices[0].message.content or ""
         non_think_text = self._remove_thoughts_from_str(response_str)
         tool_calls = ""
-        if "[CALL]" in non_think_text:
+        if len(tools) > 0 and "[CALL]" in non_think_text:
             tool_calls = "[CALL]".join(non_think_text.split("[CALL]")[1:])
             response_str = response_str.replace(tool_calls, "")
         return response_str.strip(), _parse_tool_calls(tool_calls.strip(), tools)
@@ -224,8 +246,10 @@ class LLM(object):
                     messages = messages + [ChatMessage(role="system", content=system_prompt)]
                 else:
                     messages = [ChatMessage(role="system", content=system_prompt)] + messages
+                    
+            actual_model = self._mapped_names[model] if model in self._mapped_names else model
             response = self._llms[model].chat.completions.create(
-                model=model, messages=messages, max_tokens=max_tokens, stream=True
+                model=actual_model, messages=messages, max_tokens=max_tokens, stream=True
             )
         except openai.NotFoundError as e:
             raise RuntimeError(str(e))

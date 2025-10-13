@@ -26,3 +26,11 @@ dev = [
     "ruff>=0.12.7",
     "pre-commit>=4.2.0",
 ]
+
+[project.scripts]
+quack-norris-agents = "quack_norris.agents.__main__:main"
+quack-norris-proxy = "quack_norris.servers.llm_proxy:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

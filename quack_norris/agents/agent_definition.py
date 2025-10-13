@@ -12,6 +12,8 @@ class AgentDefinition(BaseModel):
     tool_filters: List[str]
     context_name: str = "context"
     no_think: bool = True
+    model: str = ""
+    system_prompt_last: bool = False
 
     @staticmethod
     def from_file(path: str) -> "AgentDefinition":
@@ -29,6 +31,8 @@ class AgentDefinition(BaseModel):
         description = yaml_meta.get(
             "description", "An agent that can process user queries and provide answers."
         ).strip()
+        model = yaml_meta.get("model", "").strip()
+        system_prompt_last = bool(yaml_meta.get("system_prompt_last", False))
         if "tools" in yaml_meta:
             tool_filters = yaml_meta.get("tools", "")
             tool_filters = [t.strip() for t in tool_filters.split(",")]
@@ -44,6 +48,8 @@ class AgentDefinition(BaseModel):
             tool_filters=tool_filters,
             context_name=context_name,
             no_think=no_think,
+            model=model,
+            system_prompt_last=system_prompt_last,
         )
 
     def _as_tool(self, callback: Callable) -> Tool:
