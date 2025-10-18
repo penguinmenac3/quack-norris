@@ -89,6 +89,12 @@ class AgentRunner:
             # print(f"Tools (all) {[tool.name for tool in tools]}")
             # print(f"Tools (current) {[tool.name for tool in current_tools]}")
 
+            # Add limitations to agent what it does and encourage handover
+            system_prompt += "\n\n"
+            if len(current_tools) > 0 and step < self._max_steps - 1:
+                system_prompt += "Final note, if you think a question / task is not in your competence call the agent better suited for it. If no agent matches the `agent.auto` is the front desk taking care of it.\n"
+            system_prompt += "If you cannot answer a question, because it does not fit to your job and you cannot give it to another agent. Let the user politely know."
+
             # Send request to LLM
             response = self._llm.chat_stream(
                 model=agent.model if agent.model != "" else default_model,
@@ -124,7 +130,7 @@ class AgentRunner:
                     if hasattr(result, "__await__"):  # Await async tool calls
                         result = await result
                     result = str(result)
-                    shared["chat_messages"].append(ChatMessage(role="tool", content=result))
+                    shared["chat_messages"].append(ChatMessage(role="assistant", content=result))
                     await output.thought(f"Result:\n\n```\n{result}\n```\n")
                 else:
                     await output.thought(f"Failed parsing toolcall: `{tool_call}`")
