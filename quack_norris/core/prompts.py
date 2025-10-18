@@ -13,7 +13,7 @@ You have access to the following tools:
 You can access the tools. Use them if you think they are suited for solving the task.
 If you decide to invoke any of the function(s), you MUST put it in the format of
 {{"name": function name, "parameters": dictionary of argument name and its value}}
-You SHOULD NOT include any other text in the response if you call a function.
+You SHOULD NOT include any other text in the response after you specify a function call.
 First print "[CALL] " and then a json object specifying the tool call you want to make.
 If you do not print "[CALL] ", the tool will not be called.
 
@@ -28,5 +28,5 @@ If you do not want to call a tool, do not use "[CALL]" in your response.
 The weather in berlin today is sunny.
 </example>
 
-Remember: Do not forget to prefix your toolcall with "[CALL] " if you want to use it!
+Remember: Do not forget to prefix your toolcall with "[CALL] " if you want to use it and end your message on a toolcall!
 """
