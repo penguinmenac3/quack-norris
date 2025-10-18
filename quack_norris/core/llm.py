@@ -306,7 +306,12 @@ def _parse_tool_calls(tool_calls: str, tools: list[Tool]) -> list[str | ToolCall
             tool_name = spec["name"].lower()
             args = spec["parameters"]
         except Exception as e:
-            out.append(f"Failed to load tool call `{tool_call}` with the following error: `{e}`.")
+            out.append(f"Failed to load tool call with the following error: `{e}`.\n\n"
+                       "Detected Toolcall:\n```\n{tool_call}\n```\n\n"
+                       "Possible reasons are:\n"
+                       "  - `Extra data`: You wrote somehting else after the tool call. The tool call has to be your last output.\n"
+                       "  - `Keyerror`: Your json object did not adhere to the format requiring `parameters` and `name` on top level.\n"
+                       "Make sure your message ends on a tool call with no text after it and that it adheres to the correct format.")
             continue
         found = False
         for tool in tools:

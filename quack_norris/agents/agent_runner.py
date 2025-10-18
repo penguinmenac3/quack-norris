@@ -86,6 +86,8 @@ class AgentRunner:
                 for tool in tools
                 if _matches(tool.name, agent.tool_filters) and tool.name != f"agent.{agent.name}"
             ]
+            # print(f"Tools (all) {[tool.name for tool in tools]}")
+            # print(f"Tools (current) {[tool.name for tool in current_tools]}")
 
             # Send request to LLM
             response = self._llm.chat_stream(
@@ -112,7 +114,6 @@ class AgentRunner:
             # Add the response to the history
             shared["chat_messages"].append(ChatMessage(role="assistant", content=response.text))
 
-            had_tool_call = False
             # Process tool calls and add their results to the history
             for tool_call in response.tool_calls:
                 if isinstance(tool_call, ToolCall):
@@ -125,11 +126,16 @@ class AgentRunner:
                     result = str(result)
                     shared["chat_messages"].append(ChatMessage(role="tool", content=result))
                     await output.thought(f"Result:\n\n```\n{result}\n```\n")
-                    had_tool_call = True
+                else:
+                    await output.thought(f"Failed parsing toolcall: `{tool_call}`")
+                    result = f"Failed parsing toolcall with error: `{tool_call}`."
+                    shared["chat_messages"].append(ChatMessage(role="assistant", content=result))
+                    await output.thought(f"Result:\n\n```\n{tool_call}\n```\n")
+
             await output.default("")
 
             # Exit if we did not call a tool, so we can return the flow to the user
-            if not had_tool_call:
+            if len(response.tool_calls) == 0:
                 print("Exiting runner: No tool call!")
                 return
 
