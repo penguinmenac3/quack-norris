@@ -25,6 +25,7 @@ def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandl
                 return
             except:
                 print("WARNING: Failed to use streaming api, trying non streaming.")
+                traceback.print_exc()
             # Try without streaming
             try:
                 text, _ = llm.chat(model=model_name, messages=history)
@@ -32,6 +33,7 @@ def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandl
                 return
             except:
                 print("WARNING: Failed to use non-streaming api, trying with just text.")
+                traceback.print_exc()
             # Last ditch effort, just get text
             try:
                 history = [
