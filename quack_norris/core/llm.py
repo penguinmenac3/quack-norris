@@ -10,6 +10,9 @@ from pydantic import BaseModel
 
 from quack_norris.core.prompts import TOOL_CALLING_PROMPT
 
+MAX_TOKENS = 16384
+#MAX_TOKENS = 4096
+
 
 class ImageURL(BaseModel):
     url: str
@@ -62,6 +65,8 @@ class LLMStreamingResponse(object):
         buffer: str = ""
         self._raw_text = ""
         for chunk in self._stream:
+            if len(chunk.choices) == 0:
+                continue
             token = chunk.choices[0].delta.content or ""
             self._raw_text += token  # Collect full text
             token_buffer: str = ""
@@ -148,7 +153,7 @@ class LLM(object):
             print(f"Connecting LLM: {name}")
             self._add_connection(**conn, model_display_name=name)
 
-    def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str, model_display_name: str):
+    def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str, model_display_name: str, api_version="2024-10-21"):
         if provider == "ollama":
             if model == "AUTODETECT":
                 modelListEndpoint = api_endpoint + "/api/tags"
@@ -165,7 +170,7 @@ class LLM(object):
                 raise ValueError("Model must be specified when not using ollama provider.")
             if provider == "AzureOpenAI":
                 self._llms[model_display_name] = _AzureAPI(
-                    api_version="2024-10-21", base_url=api_endpoint, api_key=api_key
+                    api_version=api_version, base_url=api_endpoint, api_key=api_key
                 )
                 self._mapped_names[model_display_name] = model
             else:
@@ -180,7 +185,7 @@ class LLM(object):
         self,
         model: str,
         messages: list[ChatMessage],
-        max_tokens: int = 16384,
+        max_tokens: int = MAX_TOKENS,
         remove_thoughts=True,
         tools: list[Tool] = [],
         tool_calling_prompt: str = TOOL_CALLING_PROMPT,
@@ -222,7 +227,7 @@ class LLM(object):
         self,
         model: str,
         messages: list[ChatMessage],
-        max_tokens: int = -1,
+        max_tokens: int = MAX_TOKENS,
         remove_thoughts=True,
         tools: list[Tool] = [],
         tool_calling_prompt: str = TOOL_CALLING_PROMPT,
