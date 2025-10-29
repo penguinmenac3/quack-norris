@@ -67,7 +67,7 @@ class MCPClient:
                 Tool(
                     name=prefix + tool.name,
                     description=tool.description or "missing description",
-                    arguments=str(tool.inputSchema or "missing arguments definition"),
+                    parameters=tool.inputSchema["properties"],
                     tool_callable=self._make_callable(tool.name),
                 )
                 for tool in tools

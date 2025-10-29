@@ -1,6 +1,7 @@
 import os
 import datetime
 import dotenv
+import uuid
 
 from quack_norris.agents.agent_definition import AgentDefinition
 from quack_norris.core.llm import LLM, ChatMessage, Tool, ToolCall
@@ -65,7 +66,6 @@ class AgentRunner:
         default_model = os.environ.get("MODEL", "AUTODETECT")
         if default_model == "AUTODETECT":
             default_model = os.environ.get("DEFAULT_MODEL", "gemma3:12b")
-        is_system_prompt_last = os.environ.get("SYSTEM_PROMPT_LAST", False) in [True, "true", "1", "yes", "on"]
 
         shared = {"chat_messages": history, "agent": agent_name, "task": ""}
         for step in range(max(self._max_steps, 1)):
@@ -102,7 +102,6 @@ class AgentRunner:
                 tools=current_tools if step < self._max_steps - 1 else [],
                 system_prompt=system_prompt,
                 no_think=agent.no_think,
-                system_prompt_last=agent.system_prompt_last if agent.model != "" else is_system_prompt_last,
             )
 
             # Stream the response
@@ -118,7 +117,11 @@ class AgentRunner:
                     await output.thought(chunk, end="")
 
             # Add the response to the history
-            shared["chat_messages"].append(ChatMessage(role="assistant", content=response.text))
+            shared["chat_messages"].append(ChatMessage(
+                role="assistant",
+                content=response.text,
+                tool_calls=response.tool_calls
+            ))
 
             # Process tool calls and add their results to the history
             for tool_call in response.tool_calls:
@@ -130,12 +133,12 @@ class AgentRunner:
                     if hasattr(result, "__await__"):  # Await async tool calls
                         result = await result
                     result = str(result)
-                    shared["chat_messages"].append(ChatMessage(role="assistant", content=result))
+                    shared["chat_messages"].append(ChatMessage(role="tool", content=result, tool_call_id=tool_call.id))
                     await output.thought(f"Result:\n\n```\n{result}\n```\n")
                 else:
                     await output.thought(f"Failed parsing toolcall: `{tool_call}`")
                     result = f"Failed parsing toolcall with error: `{tool_call}`."
-                    shared["chat_messages"].append(ChatMessage(role="assistant", content=result))
+                    shared["chat_messages"].append(ChatMessage(role="tool", content=result, tool_call_id=str(uuid.uuid4())))
                     await output.thought(f"Result:\n\n```\n{tool_call}\n```\n")
 
             await output.default("")

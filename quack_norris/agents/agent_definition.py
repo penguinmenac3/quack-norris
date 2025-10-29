@@ -2,7 +2,7 @@ from typing import Callable, List
 import yaml
 from pydantic import BaseModel
 
-from quack_norris.core.llm import Tool
+from quack_norris.core.llm import Tool, ToolParameter
 
 
 class AgentDefinition(BaseModel):
@@ -54,17 +54,20 @@ class AgentDefinition(BaseModel):
         )
 
     def _as_tool(self, callback: Callable) -> Tool:
+        parameters = {}
         if "{task}" in self.system_prompt:
-            task = "  - task: The task to process. If not provided, the agent will extract the task from the chat history.\n"
-        else:
-            task = ""
+            parameters["task"] = ToolParameter(
+                type="string",
+                description="The task to process. If not provided, the agent will extract the task from the chat history."
+            )
         if "{" + self.context_name + "}" in self.system_prompt:
-            ctx = f"  - {self.context_name}: The context to use for the task. If not provided, the agent will extract the context from the chat history.\n"
-        else:
-            ctx = ""
+            parameters[self.context_name] = ToolParameter(
+                type="string",
+                description="The context to use for the task. If not provided, the agent will extract the context from the chat history."
+            )
         return Tool(
             name="agent." + self.name,
             description=self.description,
-            arguments=(task + ctx).strip("\n"),
+            parameters=parameters,
             tool_callable=callback,
         )

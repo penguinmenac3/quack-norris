@@ -3,6 +3,7 @@ import concurrent.futures
 import requests
 import re
 import json
+import uuid
 
 import openai
 from openai import AzureOpenAI as _AzureAPI
@@ -25,9 +26,28 @@ class ChatContent(BaseModel):
     image_url: Optional[ImageURL] = None
 
 
+class ToolParameter(TypedDict):
+    type: str
+    description: str
+
+class Tool(BaseModel):
+    name: str
+    description: str
+    parameters: dict[str, ToolParameter]
+    tool_callable: Callable
+
+
+class ToolCall(BaseModel):
+    id: str
+    tool: Tool
+    params: dict[str, Any]
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str | list[ChatContent]
+    tool_calls: Optional[list[str | ToolCall | Any]] = None
+    tool_call_id: Optional[str] = None
 
     def text(self) -> str:
         if isinstance(self.content, str):
@@ -37,18 +57,6 @@ class ChatMessage(BaseModel):
                 if elem.type == "text" and elem.text is not None:
                     return elem.text
         return ""
-
-
-class Tool(BaseModel):
-    name: str
-    description: str
-    arguments: str
-    tool_callable: Callable
-
-
-class ToolCall(BaseModel):
-    tool: Tool
-    params: dict[str, Any]
 
 
 class LLMStreamingResponse(object):
@@ -63,12 +71,20 @@ class LLMStreamingResponse(object):
         is_tool_call = False
         is_thinking = False
         tool_calls: str = ""
+        native_tool_calls = {}
         buffer: str = ""
         self._raw_text = ""
         for chunk in self._stream:
             if len(chunk.choices) == 0:
                 continue
             token = chunk.choices[0].delta.content or ""
+            for tool_call in chunk.choices[0].delta.tool_calls or []:
+                if tool_call.id is None:
+                    continue
+                native_tool_calls[tool_call.id] = {
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments
+                }
             self._raw_text += token  # Collect full text
             token_buffer: str = ""
             for char in token:
@@ -105,6 +121,7 @@ class LLMStreamingResponse(object):
             yield buffer
 
         self._tool_calls = _parse_tool_calls(tool_calls.strip(), self._tools)
+        self._tool_calls.extend(_parse_native_tool_calls(native_tool_calls, self._tools))
 
     @property
     def tool_calls(self) -> list[str | ToolCall]:
@@ -198,30 +215,25 @@ class LLM(object):
         self,
         model: str,
         messages: list[ChatMessage],
-        max_tokens: int = MAX_TOKENS,
         remove_thoughts=True,
         tools: list[Tool] = [],
-        tool_calling_prompt: str = TOOL_CALLING_PROMPT,
         system_prompt: str = "",
         no_think: bool = False,
         system_prompt_last: bool = False,
     ) -> tuple[str, list[str | ToolCall]]:
+        actual_model = self._mapped_names[model] if model in self._mapped_names else model
+        unofficial_toolcalling = self._llms_configs[model].get("unofficial_toolcalling", False)
+        system_prompt_last = self._llms_configs[model].get("system_prompt_last", False)
+        messages = self._prepare_messages(model, messages, tools, system_prompt, no_think, remove_thoughts, unofficial_toolcalling, system_prompt_last)
         try:
-            if remove_thoughts:
-                messages = [self._remove_thoughts(message) for message in messages]
-            if system_prompt != "":
-                system_prompt = LLM.build_system_prompt(
-                    system_prompt, tools, tool_calling_prompt, no_think
+            if unofficial_toolcalling or len(tools) == 0:
+                response = self._llms[model].chat.completions.create(
+                    model=actual_model, messages=messages, stream=False
                 )
-                if system_prompt_last:
-                    messages = messages + [ChatMessage(role="system", content=system_prompt)]
-                else:
-                    messages = [ChatMessage(role="system", content=system_prompt)] + messages
-            
-            actual_model = self._mapped_names[model] if model in self._mapped_names else model
-            response = self._llms[model].chat.completions.create(
-                model=actual_model, messages=messages, max_tokens=max_tokens, stream=False
-            )
+            else:
+                response = self._llms[model].chat.completions.create(
+                    model=actual_model, messages=messages, stream=False, tools=self._prepare_tools(tools)
+                )
         except openai.NotFoundError as e:
             raise RuntimeError(str(e))
         if isinstance(response, list):
@@ -240,33 +252,91 @@ class LLM(object):
         self,
         model: str,
         messages: list[ChatMessage],
-        max_tokens: int = MAX_TOKENS,
-        remove_thoughts=True,
         tools: list[Tool] = [],
-        tool_calling_prompt: str = TOOL_CALLING_PROMPT,
         system_prompt: str = "",
         no_think: bool = False,
-        system_prompt_last: bool = False,
+        remove_thoughts=True,
     ) -> LLMStreamingResponse:
+        actual_model = self._mapped_names[model] if model in self._mapped_names else model
+        unofficial_toolcalling = self._llms_configs[model].get("unofficial_toolcalling", False)
+        system_prompt_last = self._llms_configs[model].get("system_prompt_last", False)
+        messages = self._prepare_messages(model, messages, tools, system_prompt, no_think, remove_thoughts, unofficial_toolcalling, system_prompt_last)
         try:
-            if remove_thoughts:
-                messages = [self._remove_thoughts(message) for message in messages]
-            if system_prompt != "":
-                system_prompt = LLM.build_system_prompt(
-                    system_prompt, tools, tool_calling_prompt, no_think
+            if unofficial_toolcalling or len(tools) == 0:
+                response = self._llms[model].chat.completions.create(
+                    model=actual_model, messages=messages, stream=True
                 )
-                if system_prompt_last:
-                    messages = messages + [ChatMessage(role="system", content=system_prompt)]
-                else:
-                    messages = [ChatMessage(role="system", content=system_prompt)] + messages
-                    
-            actual_model = self._mapped_names[model] if model in self._mapped_names else model
-            response = self._llms[model].chat.completions.create(
-                model=actual_model, messages=messages, max_tokens=max_tokens, stream=True
-            )
+            else:
+                response = self._llms[model].chat.completions.create(
+                    model=actual_model, messages=messages, stream=True, tools=self._prepare_tools(tools)
+                )
         except openai.NotFoundError as e:
             raise RuntimeError(str(e))
         return LLMStreamingResponse(response, tools)
+    
+    def _prepare_tools(
+        self,
+        tools: list[Tool] = []
+    ) -> list[dict[str, Any]]:
+        result = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": tool.parameters,
+                        "required": list(tool.parameters.keys()),
+                    },
+                }
+            }
+            for tool in tools
+        ]
+        return result
+
+    def _prepare_messages(
+        self,
+        model: str,
+        messages: list[ChatMessage],
+        tools: list[Tool],
+        system_prompt: str,
+        no_think: bool,
+        remove_thoughts: bool,
+        unofficial_toolcalling: bool,
+        system_prompt_last: bool,
+    ) -> list[ChatMessage]:
+        if remove_thoughts:
+            messages = [self._remove_thoughts(message) for message in messages]
+
+        # Convert tool calls to openai format
+        for message in messages:
+            if message.tool_calls is not None:
+                message.tool_calls = [
+                    {
+                        "id": tc.id if hasattr(tc, "id") else str(uuid.uuid4()),
+                        "type": "function",
+                        "function": {
+                            "name": tc.tool.name if hasattr(tc, "tool") else "",
+                            "arguments": json.dumps(tc.params) if hasattr(tc, "params") else "{}"
+                        }
+                    }
+                    for tc in message.tool_calls
+                    if isinstance(tc, ToolCall)
+                ]
+
+        if len(tools) > 0 and unofficial_toolcalling:
+            tool_prompt = LLM._build_tool_prompt(tools, TOOL_CALLING_PROMPT)
+            system_prompt += "\n\n" + tool_prompt
+        if no_think:
+            system_prompt += " /no_think"  # Add /no_think to turn of thinking
+
+        if system_prompt_last:
+            messages = messages + [ChatMessage(role="system", content=system_prompt)]
+        else:
+            messages = [ChatMessage(role="system", content=system_prompt)] + messages
+
+        return messages
 
     def _remove_thoughts_from_str(self, message: str) -> str:
         """Remove <think>...</think> tags from the string."""
@@ -287,31 +357,40 @@ class LLM(object):
         return list(self._llms.keys())
 
     @staticmethod
-    def build_system_prompt(
-        system_prompt: str,
-        tools: list[Tool],
-        tool_calling_prompt: str,
-        no_think: bool,
-    ) -> str:
-        if len(tools) > 0:
-            tool_prompt = LLM._build_tool_prompt(tools, tool_calling_prompt)
-            system_prompt += "\n\n" + tool_prompt
-        if no_think:
-            pass
-            # system_prompt += " /no_think"  # Add /no_think to turn of thinking
-        return system_prompt
-
-    @staticmethod
     def _build_tool_prompt(tools: list[Tool], tool_calling_prompt: str) -> str:
         tool_descriptions: list[str] = []
         for tool in tools:
             description = tool.description
             if description.endswith("."):
                 description = description[:-1]
+            parameters = ""
+            for param_name, param_details in tool.parameters.items():
+                parameters += f"  - {param_name}: {param_details['description']}\n"
             tool_descriptions.append(
-                f"* {tool.name.lower()}: {description}.\n{tool.arguments}".strip()
+                f"* {tool.name.lower()}: {description}.\n{parameters}\n".strip()
             )
         return tool_calling_prompt.format(tools="\n".join(tool_descriptions))
+
+
+def _parse_native_tool_calls(tool_calls: dict[str, dict], tools: list[Tool]) -> list[str | ToolCall]:
+    out = []
+    for call_id, tool_call in tool_calls.items():
+        tool_name = tool_call["name"]
+        args = tool_call["arguments"]
+        if isinstance(args, str):
+            if args != "":
+                args = json.loads(args)
+            else:
+                args = {}
+        found = False
+        for tool in tools:
+            if tool.name.lower() == tool_name:
+                out.append(ToolCall(id=call_id, tool=tool, params=args))
+                found = True
+                break
+        if not found:
+            out.append(f"Tool '{tool_name}' not found.")
+    return out
 
 
 def _parse_tool_calls(tool_calls: str, tools: list[Tool]) -> list[str | ToolCall]:
@@ -334,7 +413,7 @@ def _parse_tool_calls(tool_calls: str, tools: list[Tool]) -> list[str | ToolCall
         found = False
         for tool in tools:
             if tool.name.lower() == tool_name:
-                out.append(ToolCall(tool=tool, params=args))
+                out.append(ToolCall(id=str(uuid.uuid4()), tool=tool, params=args))
                 found = True
                 break
         if not found:
