@@ -18,24 +18,31 @@ def make_agent_handlers(config: dict[str, Any], llm: LLM, work_dir: str, config_
     # load tools from MCP servers
     tools = []
     if "mcps" in config:
+        print("Connecting to MCPs")
         mcps = config["mcps"]
-        for name, mcp_config in mcps.items():
-            name = (
-                name.replace("-", "_")
-                .replace("/", "_")
-                .replace(".", "_")
-                .replace("(", "_")
-                .replace(")", "_")
-            )
-            try:
+        async def _gather_tools():
+            tasks = []
+            for name, mcp_config in mcps.items():
+                name = (
+                    name.replace("-", "_")
+                    .replace("/", "_")
+                    .replace(".", "_")
+                    .replace("(", "_")
+                    .replace(")", "_")
+                )
                 client = MCPClient(**mcp_config)
-                tools += asyncio.run(client.list_tools(prefix=f"{name}."))
-            except Exception as e:
-                print(f"WARNING: Failed to set up MCP `{name}` with error `{e}`")
+                tasks.append(client.list_tools(prefix=f"{name}."))
+            for result in await asyncio.gather(*tasks, return_exceptions=True):
+                if isinstance(result, Exception):
+                    print(f"WARNING: Failed to gather tools from MCP for reason: {result}")
+                else:
+                    tools.extend(result)  #type: ignore
 
+        asyncio.run(_gather_tools())
         print("MCP Tools Discovered")
         for tool in tools:
             print(f"* {tool.name}: {tool.description}")
+        print(f"Connected {len(tools)} tools")
     else:
         print(f"No MCP servers configured. Add a `mcps` section to `{config_path}` to configure them.")
 
@@ -59,12 +66,18 @@ def make_agent_handlers(config: dict[str, Any], llm: LLM, work_dir: str, config_
         for fname in files:
             if fname.endswith(".agent.md"):
                 file_path = os.path.join(root, fname)
+                rootname = os.path.relpath(root, agents_path)
+                rootname = rootname.replace("/", ".").replace("\\", ".")
+                agent_name = rootname + "." + fname.replace(".agent.md", "")
+                while agent_name.startswith("."):
+                    agent_name = agent_name[1:]
                 try:
-                    agent = AgentDefinition.from_file(file_path)
+                    agent = AgentDefinition.from_file(file_path, name=agent_name)
                     agents[agent.name] = agent
                 except Exception as e:
                     print(f"WARNING: Failed to load agent `{fname}` for reason {e}")
 
+    print(f"Loaded {len(agents.keys())} agents")
     runner = AgentRunner(
         llm=llm, default_agent="auto", agents=agents, tools=tools
     )
@@ -79,4 +92,4 @@ def make_agent_handlers(config: dict[str, Any], llm: LLM, work_dir: str, config_
 
         return _handle_chat
     
-    return {k: _make_handler(k) for k in agents.keys()}
+    return {f"agent.{k}": _make_handler(k) for k in agents.keys()}

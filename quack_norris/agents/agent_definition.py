@@ -16,7 +16,7 @@ class AgentDefinition(BaseModel):
     system_prompt_last: bool = False
 
     @staticmethod
-    def from_file(path: str) -> "AgentDefinition":
+    def from_file(path: str, name: str="") -> "AgentDefinition":
         with open(path, "r", encoding="utf-8") as f:
             prompt = f.read()
         parts = prompt.split("---")
@@ -27,7 +27,8 @@ class AgentDefinition(BaseModel):
         system_prompt = "---".join(parts[2:]).strip()
         meta = parts[1]
         yaml_meta = yaml.safe_load(meta)
-        name = yaml_meta.get("name", "Agent").strip()
+        if name == "":
+            name = yaml_meta.get("name", "Agent").strip()
         description = yaml_meta.get(
             "description", "An agent that can process user queries and provide answers."
         ).strip()

@@ -1,4 +1,5 @@
 from typing import Any, Callable, Generator, Optional, TypedDict
+import concurrent.futures
 import requests
 import re
 import json
@@ -123,11 +124,11 @@ class LLMStreamingResponse(object):
 
 
 class ConnectionSpec(TypedDict):
-        api_endpoint: str
-        api_key: str
-        provider: str  # "openai", "AzureOpenAI", "ollama"
-        model: str  # model name or "AUTODETECT"
-
+    api_endpoint: str
+    api_key: str
+    provider: str  # "openai", "AzureOpenAI", "ollama"
+    model: str  # model name or "AUTODETECT"
+    config: dict  # any additional config for the model
 
 class LLM(object):
     @staticmethod
@@ -141,6 +142,7 @@ class LLM(object):
                     api_key="ollama",
                     provider="ollama",
                     model="AUTODETECT",
+                    config={}
                 ),
             }
 
@@ -149,11 +151,19 @@ class LLM(object):
     def __init__(self, connections: dict[str, ConnectionSpec]):
         self._llms = {}
         self._mapped_names = {}
-        for name, conn in connections.items():
-            print(f"Connecting LLM: {name}")
-            self._add_connection(**conn, model_display_name=name)
+        self._llms_configs = {}
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(self._add_connection, **conn, model_display_name=name)
+                for name, conn in connections.items()
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()  # Raise exceptions if any
+        print(f"{len(self._llms.keys())} LLMs initialized")
 
-    def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str, model_display_name: str, api_version="2024-10-21"):
+    def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str,
+                        model_display_name: str, config: dict={}, api_version="2024-10-21"):
+        print(f"Connecting LLM: {model_display_name}")
         if provider == "ollama":
             if model == "AUTODETECT":
                 modelListEndpoint = api_endpoint + "/api/tags"
@@ -165,6 +175,7 @@ class LLM(object):
                 models = [model]
             for model in models:
                 self._llms[model] = _OpenAIAPI(base_url=api_endpoint + "/v1", api_key=api_key)
+                self._llms_configs[model] = config
         else:
             if model == "AUTODETECT":
                 raise ValueError("Model must be specified when not using ollama provider.")
@@ -173,9 +184,11 @@ class LLM(object):
                     api_version=api_version, base_url=api_endpoint, api_key=api_key
                 )
                 self._mapped_names[model_display_name] = model
+                self._llms_configs[model_display_name] = config
             else:
                 self._llms[model_display_name] = _OpenAIAPI(base_url=api_endpoint, api_key=api_key)
                 self._mapped_names[model_display_name] = model
+                self._llms_configs[model_display_name] = config
 
     def embeddings(self, model: str, input: str | list[str]) -> list[list[float]]:
         response = self._llms[model].embeddings.create(input=input, model=model)

@@ -1,7 +1,7 @@
 from typing import Literal
+import asyncio
 import subprocess
 import sys
-import time
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport, SSETransport, StdioTransport
 
@@ -54,7 +54,7 @@ class MCPClient:
                     shell=sys.platform == "win32",
                     close_fds=True,
                 )
-                time.sleep(5)
+                await asyncio.sleep(5)
             except Exception as e:
                 print(f"Failed to start background process: {e}")
 

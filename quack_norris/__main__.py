@@ -24,6 +24,7 @@ def main(work_dir=None):
         exit(1)
     
     # Setup environment variables from config
+    print("Initializing LLMs")
     llm = LLM.from_config(config)
 
     handlers = {}

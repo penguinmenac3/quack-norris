@@ -48,4 +48,4 @@ def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandl
                 await output.write("ERROR: The selected LLM has an error. Please try again later and contact the admin if the error persists.", clean=False)
 
         return _handle_chat
-    return {k: _make_handler(k) for k in llm.get_models() if k in config["proxy"]}
+    return {f"proxy.{k}": _make_handler(k) for k in llm.get_models() if k in config["proxy"]}
