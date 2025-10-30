@@ -83,7 +83,10 @@ def create_openai_api(handlers: dict[str, ChatHandler], debug=False) -> FastAPI:
                 # Run the graph in a background task
                 async def run_graph():
                     output = OutputWriter(queue=queue)
-                    await handlers[request.model](history=request.messages, output=output)
+                    try:
+                        await handlers[request.model](history=request.messages, output=output)
+                    except Exception as e:
+                        await output.default(f"Unexpected error occured:\n\n```\n{e}\n```\n")
                     await output.clear()
                     await queue.put(None)  # Sentinel to signal completion
 
