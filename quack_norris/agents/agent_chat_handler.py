@@ -79,7 +79,7 @@ def make_agent_handlers(config: dict[str, Any], llm: LLM, work_dir: str, config_
 
     print(f"Loaded {len(agents.keys())} agents")
     runner = AgentRunner(
-        llm=llm, default_agent="auto", agents=agents, tools=tools
+        llm=llm, default_agent="auto", agents=agents, tools=tools, default_model=config.get("default_model", "gemma3:12b")
     )
 
     # Serve agents via chat api

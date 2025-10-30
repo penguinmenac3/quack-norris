@@ -1,6 +1,4 @@
-import os
 import datetime
-import dotenv
 import uuid
 
 from quack_norris.agents.agent_definition import AgentDefinition
@@ -15,6 +13,7 @@ class AgentRunner:
         default_agent: str,
         agents: dict[str, AgentDefinition],
         tools: list[Tool],
+        default_model: str,
         max_steps: int = 5,
     ):
         self._llm = llm
@@ -22,6 +21,7 @@ class AgentRunner:
         self._agents = agents
         self._tools = tools
         self._max_steps = max_steps
+        self._default_model = default_model
 
     def _determine_agent(self, history: list[ChatMessage], agent: str) -> str:
         agent = self._default_agent
@@ -62,11 +62,6 @@ class AgentRunner:
             agent_name = self._determine_agent(history, agent_name)
             tools += [agent._as_tool(_switch_tool(key)) for key, agent in self._agents.items()]
 
-        dotenv.load_dotenv()
-        default_model = os.environ.get("MODEL", "AUTODETECT")
-        if default_model == "AUTODETECT":
-            default_model = os.environ.get("DEFAULT_MODEL", "gemma3:12b")
-
         shared = {"chat_messages": history, "agent": agent_name, "task": ""}
         for step in range(max(self._max_steps, 1)):
             # Prepare the system prompt
@@ -97,7 +92,7 @@ class AgentRunner:
 
             # Send request to LLM
             response = self._llm.chat_stream(
-                model=agent.model if agent.model != "" else default_model,
+                model=agent.model if agent.model != "" else self._default_model,
                 messages=shared["chat_messages"][-10:], # only pass last 10 messages to AI
                 tools=current_tools if step < self._max_steps - 1 else [],
                 system_prompt=system_prompt,
