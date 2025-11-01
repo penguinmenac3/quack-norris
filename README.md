@@ -1,41 +1,46 @@
 # 🦆 Quack Norris - the code savy star 🌟 
 
-![picture of quack norris](images/duck_low_res.png)
+![picture of quack norris](images/quack-norris-2.0.png)
 
-Are you tired of spending hours ⏳ debugging your code? Look no further! Quack Norris 🦆 is here to save the day. This AImazing rubber duck will be your trusty AI companion 🤖, helping you tackle anything on your PC 💻.
+Are you tired of spending hours ⏳ debugging your code, reading papers or writing e-mails? Look no further! Quack Norris 🦆 is here to save the day. This AImazing rubber duck will be your trusty AI companion 🤖, helping you tackle anything on your PC 💻.
 
-**Agentic AI Core**: Experience agentic AI using any language model provider through this UI. This innovative platform allows tools and retrieval-augmented generation (RAG) functionalities to be used with ease. 🤖💬
+**Agentic AI Core**: Experience agentic AI using any language model provider through quack-norris. Define simple agents with markdown and connect MCP tools.This innovative platform allows tools and retrieval-augmented generation (RAG) functionalities to be used with ease. 🤖💬
 
 ![agentic-core-visualization](./docs/agent.excalidraw.svg)
 
 ## 👨‍💻 Usage 
 
-Visit https://penguinmenac3.github.io/quack-norris/ and install it as a web app.
-Additionally you can use the [quack-norris-floaty](https://penguinmenac3.github.io/quack-norris-floaty/) to have the app available on your desktop at all times, but there some features might not work fully.
+1. Install git and the uv package manager on your system.
+2. Clone this git repository and install quack-norris.
+  ```bash
+  git clone --recursive https://...
+  cd quack-norris
+  uv sync
+  ```
+3. Start quack norris (from terminal or even add the exe to autostart)
+  ```bash
+  uv run quack-norris
+  ```
 
-### Enable CORS for OLLAMA
+### Alternative (OpenAI API compatible UI only)
 
-When using ollama you have to enable CORS so that the app cann access it from the webui.
+If you do not want to install the full agentic quack norris or want to access your quack norris server from your phone or a mobile device, you can just use the web app. Visit https://penguinmenac3.github.io/quack-norris/ and install it as a web app.
+
+**Direct Ollama Support:** If you want to use ollama directly in the UI without the agentic core inbetween, you need to enable CORS, so that the app can access your local ollama.
 To achieve this, add `OLLAMA_ORIGINS=*` to the environment variables.
 
 ![Environment variables on windows](images/OllamaCORSConfig.png)
 
-### 🎨 Config
-
-When you open the app for the first time, it will try to use your local ollama as an LLM provider.
-If you do not have ollama or want to use any Open AI compatible LLM service, you can open the settings and configure your LLM connections there. (Note that the server has to allow cross-origin requests.)
-
-Additionally, you can add MCP tools hosted via http. Note stdio MCPs do not work, since we are a web application.
+The web app will come preconfigured with a connection to your local ollama.
+In the webapp you can configure the connections in the settings in the app (top right).
+There you can add any OpenAI compatible LLM provider (even a quack-norris running on a different PC).
 
 
 ## 💡 Roadmap
 
 - UX / UI
   * [ ] Settings
-    - [X] Configure connections to LLMs
-    - [%] Configure connections to tools
-      * [ ] Provide http url to MCP server + headers for login
-      * [ ] Allow declaring that a tool is in Web or RaG group
+    - [X] Configure connections to LLMs (OpenAI compatible APIs)
   * [ ] Manage Chats / Conversations
     - [X] New chat
     - [ ] Change icon for new chat
@@ -44,12 +49,12 @@ Additionally, you can add MCP tools hosted via http. Note stdio MCPs do not work
     - [ ] Reopen old conversation
     - [ ] Delete old conversation
   * [X] Image support (allow pasting, dragging or uploading an image / screenshot)
-  * [ ] Activate / deactivate tools
-    - [ ] Quick MCP tools (Web, RaG, Deep Thought = agentic loop)
-      * [ ] Button for Agentic
-    - [ ] Other MCP tools (via dropdown)
-- AI Features
-  * [ ] Agentic core loop (collect context by calling tools, aggregate answer)
+- Server
+  * [X] Agentic core loop (collect context by calling tools)
+  * [ ] System tray icon and floaty for default quack-norris
+    - [ ] System tray icon allows to exit/restart server and show/hide floaty
+    - [ ] Floaty can be enabled disabled by default when launching (user preference)
+  * [ ] `quack-norris-cli` to interact with it via cli
 - Audio Features (far future)
   * [ ] Transcribe Audio (Speech-To-Text into chat input)
   * [ ] Read out responses (Text-To-Speech)
