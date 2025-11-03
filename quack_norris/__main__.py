@@ -11,10 +11,6 @@ from quack_norris.agents import MultiAgentRunner
 
 
 def main():
-    asyncio.run(async_main())
-
-
-async def async_main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--serve",
@@ -62,39 +58,43 @@ async def async_main():
     logger.info("Creating Proxies")
     handlers.update(make_proxy_handlers(config, llm))
     logger.info("Creating Agents")
-    multi_agent_runner = await MultiAgentRunner.from_config(config, llm, config_path)
+    multi_agent_runner = MultiAgentRunner.from_config(config, llm, config_path)
     handlers.update(multi_agent_runner.make_chat_handlers())
 
     if args.serve:
         logger.info("Starting server")
         serve_openai_api(handlers=handlers, port=11435)
     else:
-        if args.agent not in handlers:
-            agent_names = "\n  -".join([""] + list(handlers.keys()))
-            logger.error(
-                f"The selected agent is not a valid choice.\n  Select from:{agent_names}"
-            )
-            exit(22)  # Invalid argument
-        chat_handler = handlers[args.agent]
-        output = OutputWriter()
-        history = []
-        if args.input != "":
-            history.append(ChatMessage(role="user", content=args.input))
-            await chat_handler(history=history, output=output)
-        else:
+        asyncio.run(cli_chat(handlers, args.agent, args.input))
+
+
+async def cli_chat(handlers, agent: str, text: str):
+    if agent not in handlers:
+        agent_names = "\n  -".join([""] + list(handlers.keys()))
+        logger.error(
+            f"The selected agent is not a valid choice.\n  Select from:{agent_names}"
+        )
+        exit(22)  # Invalid argument
+    chat_handler = handlers[agent]
+    output = OutputWriter()
+    history = []
+    if text != "":
+        history.append(ChatMessage(role="user", content=text))
+        await chat_handler(history=history, output=output)
+    else:
+        while True:
+            text = ""
             while True:
-                text = ""
-                while True:
-                    line = input("> ")
-                    if line == "/exit":
-                        exit(0)
-                    if line.endswith("\\"):
-                        text += line[:-1] + "\n"
-                    else:
-                        text += line
-                        break
-                history.append(ChatMessage(role="user", content=text))
-                await chat_handler(history=history, output=output)
+                line = input("> ")
+                if line == "/exit":
+                    exit(0)
+                if line.endswith("\\"):
+                    text += line[:-1] + "\n"
+                else:
+                    text += line
+                    break
+            history.append(ChatMessage(role="user", content=text))
+            await chat_handler(history=history, output=output)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 from typing import Any
 import os
 import shutil
+import asyncio
 
 from quack_norris.logging import logger
 from quack_norris.core import (
@@ -29,13 +30,13 @@ class MultiAgentRunner:
         self._max_steps = max_steps
 
     @staticmethod
-    async def from_config(
+    def from_config(
         config: dict[str, Any], llm: LLM, config_path: str
     ) -> "MultiAgentRunner":
         # load tools from MCP servers
         tools: list[Tool] = []
         if "mcps" in config:
-            tools = await initialize_mcp_tools(config["mcps"])
+            tools = asyncio.run(initialize_mcp_tools(config["mcps"]))
         else:
             logger.warning(
                 f"No MCP servers configured. Add a `mcps` section to `{config_path}` to configure them."
