@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Any
 import asyncio
 import subprocess
 import sys
@@ -6,6 +6,36 @@ from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport, SSETransport, StdioTransport
 
 from quack_norris.core.llm import Tool
+
+
+def initialize_mcp_tools(mcp_configs: dict[str, Any]) -> list[Tool]:
+    # load tools from MCP servers
+    tools: list[Tool] = []
+    print("Connecting to MCPs")
+    async def _gather_tools():
+        tasks = []
+        for name, mcp_config in mcp_configs.items():
+            name = (
+                name.replace("-", "_")
+                .replace("/", "_")
+                .replace(".", "_")
+                .replace("(", "_")
+                .replace(")", "_")
+            )
+            client = MCPClient(**mcp_config)
+            tasks.append(client.list_tools(prefix=f"{name}."))
+        for result in await asyncio.gather(*tasks, return_exceptions=True):
+            if isinstance(result, Exception):
+                print(f"WARNING: Failed to gather tools from MCP for reason: {result}")
+            else:
+                tools.extend(result)  #type: ignore
+
+    asyncio.run(_gather_tools())
+    print("MCP Tools Discovered")
+    for tool in tools:
+        print(f"* {tool.name}: {tool.description}")
+    print(f"Connected {len(tools)} tools")
+    return tools
 
 
 class MCPClient:

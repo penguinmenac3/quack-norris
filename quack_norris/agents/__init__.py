@@ -1,7 +1,8 @@
-from quack_norris.agents.agent_runner import AgentRunner
-from quack_norris.agents.agent_definition import AgentDefinition
+from quack_norris.agents.multi_agent_runner import MultiAgentRunner
+from quack_norris.agents.agent import Agent, SimpleAgent
 
 __all__ = [
-    "AgentDefinition",
-    "AgentRunner",
+    "Agent",
+    "SimpleAgent",
+    "MultiAgentRunner",
 ]

@@ -10,7 +10,7 @@ from openai import AzureOpenAI as _AzureAPI
 from openai import OpenAI as _OpenAIAPI
 from pydantic import BaseModel
 
-from quack_norris.core.prompts import TOOL_CALLING_PROMPT
+from quack_norris.core._prompts import TOOL_CALLING_PROMPT
 
 MAX_TOKENS = 16384
 #MAX_TOKENS = 4096

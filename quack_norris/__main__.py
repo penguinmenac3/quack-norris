@@ -3,7 +3,7 @@ import json
 from quack_norris.core import LLM
 from quack_norris.servers import serve_openai_api
 from quack_norris.servers.proxy_chat_handler import make_proxy_handlers
-from quack_norris.agents.agent_chat_handler import make_agent_handlers
+from quack_norris.agents import MultiAgentRunner
 
 
 def main(work_dir=None):
@@ -31,7 +31,10 @@ def main(work_dir=None):
     print("Creating Proxies")
     handlers.update(make_proxy_handlers(config, llm))
     print("Creating Agents")
-    handlers.update(make_agent_handlers(config, llm, work_dir, config_path))
+    multi_agent_runner = MultiAgentRunner.from_config(
+        config, llm, work_dir, config_path
+    )
+    handlers.update(multi_agent_runner.make_chat_handlers())
     print("Starting server")
     serve_openai_api(handlers=handlers, port=11435)
 
