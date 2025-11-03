@@ -79,12 +79,18 @@ class LLMStreamingResponse(object):
                 continue
             token = chunk.choices[0].delta.content or ""
             for tool_call in chunk.choices[0].delta.tool_calls or []:
-                if tool_call.id is None:
-                    continue
-                native_tool_calls[tool_call.id] = {
-                    "name": tool_call.function.name,
-                    "arguments": tool_call.function.arguments
-                }
+                if tool_call.index not in native_tool_calls:
+                    native_tool_calls[tool_call.index] = {
+                        "id": "",
+                        "name": "",
+                        "arguments": ""
+                    }
+                if tool_call.id is not None:
+                    native_tool_calls[tool_call.index]["id"] = tool_call.id
+                if tool_call.function.name is not None:
+                    native_tool_calls[tool_call.index]["name"] = tool_call.function.name
+                if tool_call.function.arguments is not None:
+                    native_tool_calls[tool_call.index]["arguments"] += tool_call.function.arguments
             self._raw_text += token  # Collect full text
             token_buffer: str = ""
             for char in token:
@@ -374,9 +380,10 @@ class LLM(object):
 
 def _parse_native_tool_calls(tool_calls: dict[str, dict], tools: list[Tool]) -> list[str | ToolCall]:
     out = []
-    for call_id, tool_call in tool_calls.items():
+    for tool_call in tool_calls.values():
         tool_name = tool_call["name"]
         args = tool_call["arguments"]
+        call_id = tool_call["id"]
         if isinstance(args, str):
             if args != "":
                 args = json.loads(args)
