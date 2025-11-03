@@ -1,6 +1,7 @@
 from typing import Any
 import traceback
 
+from quack_norris.logging import logger
 from quack_norris.core import (
     LLM,
     ChatMessage,
@@ -11,7 +12,9 @@ from quack_norris.servers.openai_server import ChatHandler
 
 def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandler]:
     if "proxy" not in config:
-        print("WARNING: No proxy configuration found in config, no models will be proxied.")
+        logger.warning(
+            "No proxy configuration found in config, no models will be proxied."
+        )
         return {}
 
     # Serve agents via chat api
@@ -24,7 +27,9 @@ def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandl
                     await output.write(token, clean=False)
                 return
             except:
-                print("WARNING: Failed to use streaming api, trying non streaming.")
+                logger.warning(
+                    "WARNING: Failed to use streaming api, trying non streaming."
+                )
                 traceback.print_exc()
             # Try without streaming
             try:
@@ -32,7 +37,9 @@ def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandl
                 await output.write(text, clean=False)
                 return
             except:
-                print("WARNING: Failed to use non-streaming api, trying with just text.")
+                logger.warning(
+                    "WARNING: Failed to use non-streaming api, trying with just text."
+                )
                 traceback.print_exc()
             # Last ditch effort, just get text
             try:
@@ -43,7 +50,7 @@ def make_proxy_handlers(config: dict[str, Any], llm: LLM) -> dict[str, ChatHandl
                 await output.write(text, clean=False)
                 return
             except:
-                print("ERROR: Completely failed to retrieve.")
+                logger.error("ERROR: Completely failed to retrieve.")
                 traceback.print_exc()
                 await output.write("ERROR: The selected LLM has an error. Please try again later and contact the admin if the error persists.", clean=False)
 

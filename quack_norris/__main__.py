@@ -1,42 +1,100 @@
+import asyncio
+import argparse
 import os
 import json
-from quack_norris.core import LLM
-from quack_norris.servers import serve_openai_api
+
+from quack_norris.logging import logger, log_only_warn
+from quack_norris.core import LLM, ChatMessage, OutputWriter
+from quack_norris.servers import serve_openai_api, ChatHandler
 from quack_norris.servers.proxy_chat_handler import make_proxy_handlers
 from quack_norris.agents import MultiAgentRunner
 
 
-def main(work_dir=None):
+def main():
+    asyncio.run(async_main())
+
+
+async def async_main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="If you want to host a server instead of running directly via cli.",
+    )
+    parser.add_argument(
+        "--input",
+        type=str,
+        default="",
+        help="If you want to have a single turn only, you can provide an input.",
+    )
+    parser.add_argument(
+        "--agent",
+        type=str,
+        default="agent.auto",
+        help="Specify the agent that should be used. Note the prefix 'agent.*' is required. You can also use llms with 'proxy.*'.",
+    )
+    args = parser.parse_args()
+
+    if not args.serve:
+        log_only_warn()
+
     # Define paths
-    if work_dir is None:
-        home = os.path.expanduser("~")
-        work_dir = os.path.join(home, ".config/quack-norris")
-    config_path = os.path.join(work_dir, "config.json")
+    config_path = os.path.join(
+        os.path.expanduser("~"), ".config", "quack-norris", "config.json"
+    )
 
     # Read the config
-    print("Loading config")
+    logger.info("Loading config")
     config = {}
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             config = json.load(f)
     else:
-        print(f"No config found. Create a `{work_dir}/config.json`.")
+        logger.error(f"No config found. Create a `{config_path}`.")
         exit(1)
-    
-    # Setup environment variables from config
-    print("Initializing LLMs")
+
+    # Setup LLMs
+    logger.info("Initializing LLMs")
     llm = LLM.from_config(config)
 
-    handlers = {}
-    print("Creating Proxies")
+    # Setup Chat
+    handlers: dict[str, ChatHandler] = {}
+    logger.info("Creating Proxies")
     handlers.update(make_proxy_handlers(config, llm))
-    print("Creating Agents")
-    multi_agent_runner = MultiAgentRunner.from_config(
-        config, llm, work_dir, config_path
-    )
+    logger.info("Creating Agents")
+    multi_agent_runner = await MultiAgentRunner.from_config(config, llm, config_path)
     handlers.update(multi_agent_runner.make_chat_handlers())
-    print("Starting server")
-    serve_openai_api(handlers=handlers, port=11435)
+
+    if args.serve:
+        logger.info("Starting server")
+        serve_openai_api(handlers=handlers, port=11435)
+    else:
+        if args.agent not in handlers:
+            agent_names = "\n  -".join([""] + list(handlers.keys()))
+            logger.error(
+                f"The selected agent is not a valid choice.\n  Select from:{agent_names}"
+            )
+            exit(22)  # Invalid argument
+        chat_handler = handlers[args.agent]
+        output = OutputWriter()
+        history = []
+        if args.input != "":
+            history.append(ChatMessage(role="user", content=args.input))
+            await chat_handler(history=history, output=output)
+        else:
+            while True:
+                text = ""
+                while True:
+                    line = input("> ")
+                    if line == "/exit":
+                        exit(0)
+                    if line.endswith("\\"):
+                        text += line[:-1] + "\n"
+                    else:
+                        text += line
+                        break
+                history.append(ChatMessage(role="user", content=text))
+                await chat_handler(history=history, output=output)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from typing import Any
 import os
 import shutil
 
+from quack_norris.logging import logger
 from quack_norris.core import (
     LLM,
     ChatMessage,
@@ -28,16 +29,20 @@ class MultiAgentRunner:
         self._max_steps = max_steps
 
     @staticmethod
-    def from_config(config: dict[str, Any], llm: LLM, work_dir: str, config_path: str) -> "MultiAgentRunner":
+    async def from_config(
+        config: dict[str, Any], llm: LLM, config_path: str
+    ) -> "MultiAgentRunner":
         # load tools from MCP servers
         tools: list[Tool] = []
         if "mcps" in config:
-            tools = initialize_mcp_tools(config["mcps"])
+            tools = await initialize_mcp_tools(config["mcps"])
         else:
-            print(f"No MCP servers configured. Add a `mcps` section to `{config_path}` to configure them.")
+            logger.warning(
+                f"No MCP servers configured. Add a `mcps` section to `{config_path}` to configure them."
+            )
 
         # Check if default agent exists, if not use the default.auto.agent.md to create it
-        agents_path = os.path.join(work_dir, "agents")
+        agents_path = os.path.join(os.path.dirname(config_path), "agents")
         here = os.path.dirname(__file__)
         default_agent_src = os.path.join(here, "_default.auto.agent.md")
         default_agent_dst = os.path.join(agents_path, "auto.agent.md")
@@ -45,9 +50,11 @@ class MultiAgentRunner:
             os.makedirs(agents_path, exist_ok=True)
             if os.path.exists(default_agent_src):
                 shutil.copyfile(default_agent_src, default_agent_dst)
-                print(f"Copied default agent to {default_agent_dst}")
+                logger.info(f"Copied default agent to {default_agent_dst}")
             else:
-                print(f"WARNING: Default agent file not found at {default_agent_src}")
+                logger.warning(
+                    f"WARNING: Default agent file not found at {default_agent_src}"
+                )
 
         # Load agents from md files in all subdirectories
         default_model = config.get("default_model", "gemma3:12b")
@@ -66,7 +73,7 @@ class MultiAgentRunner:
                         ).replace("`", "")
         if agent not in self._agents.keys():
             agent = self._default_agent
-        print(f"Active agent: `{agent}`")
+        logger.info(f"Active agent: `{agent}`")
         return agent
 
     def make_chat_handlers(self) -> dict[str, ChatHandler]:
@@ -97,10 +104,12 @@ class MultiAgentRunner:
                     if agent in self._agents.keys():
                         agent_name = agent
                         kwargs = args
-                        print(f"Successfully switched to agent: `{agent}`")
+                        logger.info(f"Successfully switched to agent: `{agent}`")
                         return f"Successfully switched to agent: `{agent}`"
                     else:
-                        print(f"Failed to switch agent, unknown agent name: `{agent}`")
+                        logger.info(
+                            f"Failed to switch agent, unknown agent name: `{agent}`"
+                        )
                         return f"Failed to switch agent, unknown agent name: `{agent}`"
 
                 return _callback

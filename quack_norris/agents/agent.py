@@ -4,6 +4,7 @@ import yaml
 import datetime
 import uuid
 
+from quack_norris.logging import logger
 from quack_norris.core.llm import Tool, ToolParameter, ToolCall, ChatMessage, LLM
 from quack_norris.core.output_writer import OutputWriter
 
@@ -44,7 +45,7 @@ class SimpleAgent(Agent):
 
     @staticmethod
     def from_folder(llm: LLM, default_model: str, root_dir: str) -> dict[str, Agent]:
-        print("Loading agents")
+        logger.info("Loading agents")
         agents: dict[str, Agent] = {}
         for base_dir, _, files in os.walk(root_dir):
             for fname in files:
@@ -61,9 +62,9 @@ class SimpleAgent(Agent):
                         )
                         agents[agent._name] = agent
                     except Exception as e:
-                        print(f"WARNING: Failed to load agent `{fname}` for reason {e}")
+                        logger.warning(f"Failed to load agent `{fname}` for reason {e}")
 
-        print(f"Loaded {len(agents.keys())} agents")
+        logger.info(f"Loaded {len(agents.keys())} agents")
         return agents
 
     @staticmethod
@@ -136,8 +137,8 @@ class SimpleAgent(Agent):
             for tool in available_tools
             if _tool_matches(tool.name, self._tools) and tool.name != f"agent.{self._name}"
         ]
-        # print(f"Tools (all) {[tool.name for tool in tools]}")
-        # print(f"Tools (current) {[tool.name for tool in current_tools]}")
+        # logger.info(f"Tools (all) {[tool.name for tool in tools]}")
+        # logger.info(f"Tools (current) {[tool.name for tool in current_tools]}")
 
         # Add limitations to agent what it does and encourage handover
         system_prompt += "\n\n"
@@ -196,7 +197,7 @@ class SimpleAgent(Agent):
 
         # Exit if we did not call a tool, so we can return the flow to the user
         if len(response.tool_calls) == 0:
-            print("Exiting runner: No tool call!")
+            logger.info("Exiting runner: No tool call!")
             return True
         return False
 

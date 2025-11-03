@@ -10,6 +10,7 @@ from openai import AzureOpenAI as _AzureAPI
 from openai import OpenAI as _OpenAIAPI
 from pydantic import BaseModel
 
+from quack_norris.logging import logger
 from quack_norris.core._prompts import TOOL_CALLING_PROMPT
 
 MAX_TOKENS = 16384
@@ -182,11 +183,11 @@ class LLM(object):
             ]
             for future in concurrent.futures.as_completed(futures):
                 future.result()  # Raise exceptions if any
-        print(f"{len(self._llms.keys())} LLMs initialized")
+        logger.info(f"{len(self._llms.keys())} LLMs initialized")
 
     def _add_connection(self, api_endpoint: str, api_key: str, provider: str, model: str,
                         model_display_name: str, config: dict={}, api_version="2024-10-21"):
-        print(f"Connecting LLM: {model_display_name}")
+        logger.info(f"Connecting LLM: {model_display_name}")
         if provider == "ollama":
             if model == "AUTODETECT":
                 modelListEndpoint = api_endpoint + "/api/tags"

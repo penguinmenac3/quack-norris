@@ -5,36 +5,35 @@ import sys
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport, SSETransport, StdioTransport
 
+from quack_norris.logging import logger
 from quack_norris.core.llm import Tool
 
 
-def initialize_mcp_tools(mcp_configs: dict[str, Any]) -> list[Tool]:
+async def initialize_mcp_tools(mcp_configs: dict[str, Any]) -> list[Tool]:
     # load tools from MCP servers
     tools: list[Tool] = []
-    print("Connecting to MCPs")
-    async def _gather_tools():
-        tasks = []
-        for name, mcp_config in mcp_configs.items():
-            name = (
-                name.replace("-", "_")
-                .replace("/", "_")
-                .replace(".", "_")
-                .replace("(", "_")
-                .replace(")", "_")
-            )
-            client = MCPClient(**mcp_config)
-            tasks.append(client.list_tools(prefix=f"{name}."))
-        for result in await asyncio.gather(*tasks, return_exceptions=True):
-            if isinstance(result, Exception):
-                print(f"WARNING: Failed to gather tools from MCP for reason: {result}")
-            else:
-                tools.extend(result)  #type: ignore
+    logger.info("Connecting to MCPs")
+    tasks = []
+    for name, mcp_config in mcp_configs.items():
+        name = (
+            name.replace("-", "_")
+            .replace("/", "_")
+            .replace(".", "_")
+            .replace("(", "_")
+            .replace(")", "_")
+        )
+        client = MCPClient(**mcp_config)
+        tasks.append(client.list_tools(prefix=f"{name}."))
+    for result in await asyncio.gather(*tasks, return_exceptions=True):
+        if isinstance(result, Exception):
+            logger.warning(f"Failed to gather tools from MCP for reason: {result}")
+        else:
+            tools.extend(result)  # type: ignore
 
-    asyncio.run(_gather_tools())
-    print("MCP Tools Discovered")
+    logger.info("MCP Tools Discovered")
     for tool in tools:
-        print(f"* {tool.name}: {tool.description}")
-    print(f"Connected {len(tools)} tools")
+        logger.info(f"* {tool.name}: {tool.description}")
+    logger.info(f"Connected {len(tools)} tools")
     return tools
 
 
@@ -72,10 +71,12 @@ class MCPClient:
         try:
             return await self._try_listing_tools(prefix)
         except RuntimeError:
-            print(f"Failed to connect to: {self._url}")
+            logger.warning(f"Failed to connect to: {self._url}")
         if self._command:
             try:
-                print(f"Attempting to start: {self._command} {' '.join(self._args or [])}")
+                logger.info(
+                    f"Attempting to start: {self._command} {' '.join(self._args or [])}"
+                )
                 subprocess.Popen(
                     [self._command] + (self._args or []),
                     stdout=subprocess.DEVNULL,
@@ -86,7 +87,7 @@ class MCPClient:
                 )
                 await asyncio.sleep(5)
             except Exception as e:
-                print(f"Failed to start background process: {e}")
+                logger.warning(f"Failed to start background process: {e}")
 
         return await self._try_listing_tools(prefix)
 
