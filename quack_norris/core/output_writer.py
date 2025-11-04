@@ -2,16 +2,11 @@ from asyncio import Queue
 
 
 class OutputWriter:
-    @staticmethod
-    def get_writer(shared: dict) -> 'OutputWriter':
-        if "writer" not in shared:
-            shared["writer"] = OutputWriter()
-        return shared["writer"]
-
     def __init__(self, queue: Queue | None = None):
         self._state = "default"
         self._topic = "default"
         self._queue = queue
+        self.output_buffer = ""
 
     async def thought(self, text: str, end="\n\n") -> None:
         await self.write(text + end, message_type="thought")
@@ -34,6 +29,7 @@ class OutputWriter:
             await self._queue.put("")  # To trigger flushing
         else:
             print(text, end="")
+        self.output_buffer += text
 
     async def _change_state(self, state: str) -> None:
         topic: str = state

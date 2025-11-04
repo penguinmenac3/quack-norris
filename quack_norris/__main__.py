@@ -94,7 +94,9 @@ async def cli_chat(handlers, agent: str, text: str):
                     text += line
                     break
             history.append(ChatMessage(role="user", content=text))
-            await chat_handler(history=history, output=output)
+            await chat_handler(history=list(history), output=output)
+            history.append(ChatMessage(role="assistant", content=output.output_buffer))
+            output.output_buffer = ""
 
 
 if __name__ == "__main__":
