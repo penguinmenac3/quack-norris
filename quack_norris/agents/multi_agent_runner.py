@@ -13,7 +13,7 @@ from quack_norris.core import (
 )
 from quack_norris.agents.agent import Agent, SimpleAgent
 from quack_norris.servers import ChatHandler
-from quack_norris.mcp.client import initialize_mcp_tools
+from quack_norris.tools.mcp import initialize_mcp_tools
 
 
 class MultiAgentRunner:
