@@ -24,6 +24,12 @@ def main():
         help="If you want to have a single turn only, you can provide an input.",
     )
     parser.add_argument(
+        "--output",
+        type=str,
+        default="",
+        help="If you want to log the output also into a file, set this to the path.",
+    )
+    parser.add_argument(
         "--agent",
         type=str,
         default="agent.auto",
@@ -65,10 +71,10 @@ def main():
         logger.info("Starting server")
         serve_openai_api(handlers=handlers, port=11435)
     else:
-        asyncio.run(cli_chat(handlers, args.agent, args.input))
+        asyncio.run(cli_chat(handlers, args.agent, args.input, args.output))
 
 
-async def cli_chat(handlers, agent: str, text: str):
+async def cli_chat(handlers, agent: str, text: str, log_path: str):
     if agent not in handlers:
         agent_names = "\n  -".join([""] + list(handlers.keys()))
         logger.error(
@@ -79,8 +85,14 @@ async def cli_chat(handlers, agent: str, text: str):
     output = OutputWriter()
     history = []
     if text != "":
+        if os.path.isfile(text):
+            with open (text, "r", encoding="utf-8") as f:
+                text = f.read()
         history.append(ChatMessage(role="user", content=text))
         await chat_handler(history=history, output=output)
+        if log_path != "":
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(output.output_buffer)
     else:
         while True:
             text = ""
