@@ -99,7 +99,7 @@ class MultiAgentRunner:
         if agent_name == "":
 
             def _switch_tool(agent: str):
-                async def _callback(args: dict):
+                async def _callback(**args: dict):
                     nonlocal agent_name
                     nonlocal kwargs
                     if agent in self._agents.keys():

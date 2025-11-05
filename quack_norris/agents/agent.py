@@ -180,7 +180,7 @@ class SimpleAgent(Agent):
                 await output.thought(
                     f"Calling Tool: `{tool_call.tool.name}` with params `{tool_call.params}`"
                 )
-                result = tool_call.tool.tool_callable(tool_call.params)
+                result = tool_call.tool.tool_callable(**tool_call.params)
                 if hasattr(result, "__await__"):  # Await async tool calls
                     result = await result
                 result = str(result)

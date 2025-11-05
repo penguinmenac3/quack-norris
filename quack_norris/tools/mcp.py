@@ -105,10 +105,10 @@ class MCPClient:
             ]
 
     def _make_callable(self, tool_name):
-        async def _call_tool(args: dict) -> str:
+        async def _call_tool(**kwargs: dict) -> str:
             async with self._client:
                 try:
-                    result = await self._client.call_tool(name=tool_name, arguments=args)
+                    result = await self._client.call_tool(name=tool_name, arguments=kwargs)
                     out = ""
                     for content in result.content:
                         if content.type == "text":
