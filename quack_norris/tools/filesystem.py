@@ -49,10 +49,10 @@ class FileSystemTools:
 
         target_folder = os.path.normpath(os.path.abspath(os.path.join(self._root_folder, path)))
         if not target_folder.startswith(self._root_folder):
-            return path, f"Access to path '{path}' is not allowed."
+            return target_folder, f"Access to path '{path}' is not allowed."
         if not allow_no_exist and not os.path.exists(target_folder):
-            return path, f"Path '{path}' does not exist."
-        return path, ""
+            return target_folder, f"Path '{path}' does not exist."
+        return target_folder, ""
 
     def list_files(self, subfolder: str = ".") -> list[str]:
         """List files and folders in the specified subfolder."""
