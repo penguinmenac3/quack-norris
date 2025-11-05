@@ -62,6 +62,11 @@ class MultiAgentRunner:
         agents = SimpleAgent.from_folder(llm, default_model, agents_path)
         return MultiAgentRunner(default_agent="auto", agents=agents, tools=tools)
 
+    def add_tools(self, tools: list[Tool]):
+        for tool in tools:
+            if tool not in self._tools:
+                self._tools.append(tool)
+
     def _determine_agent(self, history: list[ChatMessage], agent: str) -> str:
         agent = self._default_agent
         for message in history:
