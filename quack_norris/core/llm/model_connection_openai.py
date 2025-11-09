@@ -1,10 +1,10 @@
 import requests
+import os
 import openai
 from openai import AzureOpenAI as _AzureAPI
 from openai import OpenAI as _OpenAIAPI
 from openai._types import NOT_GIVEN
 
-from quack_norris.core._prompts import TOOL_CALLING_PROMPT
 from quack_norris.core.llm.types import Tool, ChatMessage, LLMResponse
 from quack_norris.core.llm.model_provider import ModelConnector, register_model_connector
 from quack_norris.core.llm.utils import tools_to_openai, tools_to_custom_prompt, messages_to_openai
@@ -18,6 +18,12 @@ class OpenAIModelConnection(ModelConnector):
                         config: dict={}, api_version="2024-10-21"):
         self._config = config
         self._models: dict[str, str] = {}
+        prompt_path = config.get(
+            "custom_tool_call_prompt",
+            os.path.join(os.path.dirname(__file__), "custom_tool_call_prompt.md"),
+        )
+        with open(prompt_path, "r") as f:
+            self.custom_tool_calling_prompt = f.read()
 
         if provider == "ollama":
             if model == "AUTODETECT":
@@ -61,7 +67,7 @@ class OpenAIModelConnection(ModelConnector):
 
         messages = messages_to_openai(messages, remove_thoughts)
         if len(tools) > 0 and unofficial_toolcalling:
-            tool_prompt = tools_to_custom_prompt(tools, TOOL_CALLING_PROMPT)
+            tool_prompt = tools_to_custom_prompt(tools, self.custom_tool_calling_prompt)
             system_prompt += "\n\n" + tool_prompt
         
         # Disable thinking for models that support /no_think

@@ -1,9 +1,13 @@
-TOOL_CALLING_PROMPT = """## Tool Calling Instructions
+## Tool Calling Instructions
 
 One of your operation modes is to call tools.
-If you decided to call a tool, make sure the toolcall is the last think in your output.
+If you decided to call a tool, make sure the toolcall is the last thing in your output.
 You can use the tools to perform actions or get information that is not available in the chat history.
 You should write a short text preceeding a tool call explaining the user what you are doing, but you must never write any text after a tool call.
+
+You have two general categories of tools:
+* agents: They are specialized on solving a particular problem. If there is an agent that matches a problem, you should use that agent instead of trying to solve the problem yourself.
+* other: The rest of the tools are programs which allow you to retrieve information or do things in the world. These tools should only be used, if you think you need their service.
 
 You have access to the following tools:
 <tools>
@@ -29,4 +33,3 @@ The weather in berlin today is sunny.
 </example>
 
 Remember: Do not forget to prefix your toolcall with "[CALL] " if you want to use it and end your message on a toolcall!
-"""
