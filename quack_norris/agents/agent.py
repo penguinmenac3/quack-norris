@@ -157,9 +157,9 @@ class SimpleAgent(Agent):
             if chunk == "</think>":
                 is_thinking = False
             if not is_thinking:
-                await output.default(chunk, end="")
+                await output.default(chunk, separate=False)
             else:
-                await output.thought(chunk, end="")
+                await output.thought(chunk, separate=False)
 
         # Add the response to the history
         messages.append(ChatMessage(
@@ -179,15 +179,14 @@ class SimpleAgent(Agent):
                     result = await result
                 result = str(result)
                 messages.append(ChatMessage(role="tool", content=result, tool_call_id=tool_call.id))
-                await output.thought(f"Result:\n\n```\n{result}\n```\n")
+                await output.thought(f"Result:\n```\n{result}\n```")
             else:
                 await output.thought(f"Failed parsing toolcall: `{tool_call}`")
                 result = f"Failed parsing toolcall with error: `{tool_call}`."
                 messages.append(ChatMessage(role="tool", content=result, tool_call_id=str(uuid.uuid4())))
-                await output.thought(f"Result:\n\n```\n{tool_call}\n```\n")
+                await output.thought(f"Result:\n```\n{tool_call}\n```")
 
-        await output.default("")
-                    
+        await output.default("", separate=False)
 
         # Exit if we did not call a tool, so we can return the flow to the user
         if len(response.tool_calls) == 0:
