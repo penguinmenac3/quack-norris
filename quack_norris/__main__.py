@@ -110,9 +110,11 @@ async def cli_chat(handlers, agent: str, text: str, log_path: str):
             while True:
                 try:
                     line = input("> ")
-                except EOFError:
+                except EOFError or KeyboardInterrupt:
+                    print("CTRL+C Exiting")
                     exit(0)
                 if line == "/exit":
+                    print("Exiting")
                     exit(0)
                 if line.endswith("\\"):
                     text += line[:-1] + "\n"
