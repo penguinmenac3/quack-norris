@@ -6,11 +6,21 @@ from quack_norris.core.llm.types import Tool, LLMResponse, ToolCall
 
 class OpenAIToolCallingResponse(LLMResponse):
     def __init__(self, response, tools: list[Tool]):
-        super().__init__("Not Implemented")
-        # TODO
-        raise NotImplementedError()
-        #self._tool_calls = _parse_openai_tool_calls(text)
+        if isinstance(response, list):
+            response = response[0]
+        if response.choices[0].finish_reason == "error":
+            raise RuntimeError(response.choices[0].message.content)
+        text = response.choices[0].message.content or ""
+        tool_calls = {}
+        if hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls is not None:
+            for idx, tool_call in enumerate(response.choices[0].message.tool_calls):
+                tool_calls[idx] = {
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments,
+                    "id": tool_call.id
+                }
 
+        super().__init__(text, _parse_openai_tool_calls(tool_calls, tools))
 
 
 class OpenAIToolCallingResponseStream(LLMResponse):

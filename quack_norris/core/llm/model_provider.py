@@ -31,7 +31,6 @@ class ModelConnector(object):
         system_prompt: str = "",
         remove_thoughts: bool = True,
         stream: bool = True,
-        no_think: bool = False,
     ) -> LLMResponse:
         raise NotImplementedError()
     

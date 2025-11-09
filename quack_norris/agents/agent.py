@@ -31,13 +31,12 @@ class Agent(object):
 
 class SimpleAgent(Agent):
     def __init__(self, name: str, description: str, system_prompt: str, tools: List[str],
-                 context_name: str = "context", no_think: bool = True, model: str = "",
+                 context_name: str = "context", model: str = "",
                  system_prompt_last: bool = False):
         super().__init__(name, description)
         self._system_prompt = system_prompt
         self._tools = tools
         self._context_name = context_name
-        self._no_think = no_think
         self._model = model
         self._system_prompt_last = system_prompt_last
 
@@ -93,14 +92,12 @@ class SimpleAgent(Agent):
             tool_filters = []
 
         context_name = yaml_meta.get("context_name", "context").strip()
-        no_think = not bool(yaml_meta.get("think", False))
         return SimpleAgent(
             name=name,
             description=description,
             system_prompt=system_prompt,
             tools=tool_filters,
             context_name=context_name,
-            no_think=no_think,
             model=model,
             system_prompt_last=system_prompt_last,
         )
@@ -149,7 +146,6 @@ class SimpleAgent(Agent):
             messages=messages[-10:], # only pass last 10 messages to AI
             tools=current_tools,
             system_prompt=system_prompt,
-            no_think=self._no_think,
             stream=True,
         )
 
