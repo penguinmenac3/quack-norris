@@ -21,8 +21,8 @@ class Agent(object):
             parameters=parameters,
             tool_callable=callback,
         )
-    
-    def _get_parameters(self):
+
+    def _get_parameters(self) -> dict[str, ToolParameter]:
         return {}
 
     async def chat(self, messages: list[ChatMessage], output: OutputWriter, available_tools: List[Tool], **kwargs) -> bool:
@@ -102,7 +102,7 @@ class SimpleAgent(Agent):
             system_prompt_last=system_prompt_last,
         )
 
-    def _get_parameters(self):
+    def _get_parameters(self) -> dict[str, ToolParameter]:
         parameters = {}
         if "{task}" in self._system_prompt:
             parameters["task"] = ToolParameter(
