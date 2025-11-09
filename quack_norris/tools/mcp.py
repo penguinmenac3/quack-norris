@@ -6,7 +6,7 @@ from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport, SSETransport, StdioTransport
 
 from quack_norris.logging import logger
-from quack_norris.core.llm import Tool
+from quack_norris.core.llm.types import Tool
 
 
 async def initialize_mcp_tools(mcp_configs: dict[str, Any]) -> list[Tool]:

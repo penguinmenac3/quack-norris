@@ -3,7 +3,7 @@ import inspect
 from typing import get_type_hints
 
 from quack_norris.logging import logger
-from quack_norris.core.llm import Tool, ToolParameter
+from quack_norris.core.llm.types import Tool, ToolParameter
 
 
 def generate_schema(func):

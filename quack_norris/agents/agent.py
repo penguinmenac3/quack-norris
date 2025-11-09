@@ -5,7 +5,8 @@ import datetime
 import uuid
 
 from quack_norris.logging import logger
-from quack_norris.core.llm import Tool, ToolParameter, ToolCall, ChatMessage, LLM
+from quack_norris.core.llm.types import Tool, ToolParameter, ToolCall, ChatMessage, LLM
+from quack_norris.core.llm.model_provider import ModelProvider
 from quack_norris.core.output_writer import OutputWriter
 
 
@@ -31,11 +32,10 @@ class Agent(object):
 
 
 class SimpleAgent(Agent):
-    def __init__(self, llm: LLM, name: str, description: str, system_prompt: str, tools: List[str],
+    def __init__(self, name: str, description: str, system_prompt: str, tools: List[str],
                  context_name: str = "context", no_think: bool = True, model: str = "",
                  system_prompt_last: bool = False):
         super().__init__(name, description)
-        self._llm = llm
         self._system_prompt = system_prompt
         self._tools = tools
         self._context_name = context_name
@@ -44,7 +44,7 @@ class SimpleAgent(Agent):
         self._system_prompt_last = system_prompt_last
 
     @staticmethod
-    def from_folder(llm: LLM, default_model: str, root_dir: str) -> dict[str, Agent]:
+    def from_folder(default_model: str, root_dir: str) -> dict[str, Agent]:
         logger.info("Loading agents")
         agents: dict[str, Agent] = {}
         for base_dir, _, files in os.walk(root_dir):
@@ -58,7 +58,7 @@ class SimpleAgent(Agent):
                         agent_name = agent_name[1:]
                     try:
                         agent = SimpleAgent.from_file(
-                            llm, default_model, file_path, name=agent_name
+                            default_model, file_path, name=agent_name
                         )
                         agents[agent._name] = agent
                     except Exception as e:
@@ -68,7 +68,7 @@ class SimpleAgent(Agent):
         return agents
 
     @staticmethod
-    def from_file(llm: LLM, default_model: str, path: str, name: str="") -> "SimpleAgent":
+    def from_file(default_model: str, path: str, name: str="") -> "SimpleAgent":
         with open(path, "r", encoding="utf-8") as f:
             prompt = f.read()
         parts = prompt.split("---")
@@ -97,7 +97,6 @@ class SimpleAgent(Agent):
         context_name = yaml_meta.get("context_name", "context").strip()
         no_think = not bool(yaml_meta.get("think", False))
         return SimpleAgent(
-            llm=llm,
             name=name,
             description=description,
             system_prompt=system_prompt,
@@ -147,12 +146,13 @@ class SimpleAgent(Agent):
         system_prompt += "If you cannot answer a question, because it does not fit to your job and you cannot give it to another agent. Let the user politely know."
 
         # Send request to LLM
-        response = self._llm.chat_stream(
-            model=self._model,
+        llm = ModelProvider.get_llm(self._model)
+        response = llm(
             messages=messages[-10:], # only pass last 10 messages to AI
             tools=current_tools,
             system_prompt=system_prompt,
             no_think=self._no_think,
+            stream=True,
         )
 
         # Stream the response

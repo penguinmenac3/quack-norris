@@ -4,7 +4,9 @@ import os
 import json
 
 from quack_norris.logging import logger, log_only_warn
-from quack_norris.core import LLM, ChatMessage, OutputWriter
+from quack_norris.core.llm.types import LLM, ChatMessage
+from quack_norris.core.llm.model_provider import ModelProvider
+from quack_norris.core.output_writer import OutputWriter
 from quack_norris.servers import serve_openai_api, ChatHandler
 from quack_norris.servers.proxy_chat_handler import make_proxy_handlers
 from quack_norris.agents import MultiAgentRunner
@@ -64,14 +66,14 @@ def main():
 
     # Setup LLMs
     logger.info("Initializing LLMs")
-    llm = LLM.from_config(config)
+    ModelProvider.load_config(config.get("llms", None))
 
     # Setup Chat
     handlers: dict[str, ChatHandler] = {}
     logger.info("Creating Proxies")
-    handlers.update(make_proxy_handlers(config, llm))
+    handlers.update(make_proxy_handlers(config))
     logger.info("Creating Agents")
-    multi_agent_runner = MultiAgentRunner.from_config(config, llm, config_path)
+    multi_agent_runner = MultiAgentRunner.from_config(config, config_path)
     handlers.update(multi_agent_runner.make_chat_handlers())
 
     # Setup builtin tools

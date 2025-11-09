@@ -22,6 +22,14 @@ Are you tired of spending hours ⏳ debugging your code, reading papers or writi
   uv run quack-norris
   ```
 
+### Example agent processing
+
+For all paper transcripts in a folder saved as `.md` create a summary using the paper summarizer agent.
+
+```powershell
+Get-ChildItem -Path . -Filter *.md | Where-Object {    $_.Name -notlike '*.summary.md' -and    -not (Test-Path "$($_.DirectoryName)\$($_.BaseName).summary.md")} | ForEach-Object {    python -m quack_norris --agent agent.scientist.paper-approach-summarizer --input "$($_.FullName)" --output "$($_.DirectoryName)\$($_.BaseName).summary.md"}
+```
+
 ### Alternative (OpenAI API compatible UI only)
 
 If you do not want to install the full agentic quack norris or want to access your quack norris server from your phone or a mobile device, you can just use the web app. Visit https://penguinmenac3.github.io/quack-norris/ and install it as a web app.

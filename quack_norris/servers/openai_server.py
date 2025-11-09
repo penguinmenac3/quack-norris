@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 import uvicorn
 
-from quack_norris.core.llm import ChatMessage
+from quack_norris.core.llm.types import ChatMessage
 from quack_norris.core.output_writer import OutputWriter
 
 

@@ -5,12 +5,11 @@ import shutil
 import asyncio
 
 from quack_norris.logging import logger
-from quack_norris.core import (
-    LLM,
+from quack_norris.core.llm.types import (
     ChatMessage,
-    OutputWriter,
     Tool
 )
+from quack_norris.core.output_writer import OutputWriter
 from quack_norris.agents.agent import Agent, SimpleAgent
 from quack_norris.servers import ChatHandler
 from quack_norris.tools.mcp import initialize_mcp_tools
@@ -31,7 +30,7 @@ class MultiAgentRunner:
 
     @staticmethod
     def from_config(
-        config: dict[str, Any], llm: LLM, config_path: str
+        config: dict[str, Any], config_path: str
     ) -> "MultiAgentRunner":
         # load tools from MCP servers
         tools: list[Tool] = []
@@ -59,7 +58,7 @@ class MultiAgentRunner:
 
         # Load agents from md files in all subdirectories
         default_model = config.get("default_model", "gemma3:12b")
-        agents = SimpleAgent.from_folder(llm, default_model, agents_path)
+        agents = SimpleAgent.from_folder(default_model, agents_path)
         return MultiAgentRunner(default_agent="auto", agents=agents, tools=tools)
 
     def add_tools(self, tools: list[Tool]):
