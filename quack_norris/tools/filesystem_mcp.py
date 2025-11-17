@@ -193,31 +193,7 @@ def build_mcp_server(config_path: str | None = None):
 
 
     @mcp_server.tool
-    def search_files(workspace: str, query: str, directory: str = '.') -> list:
-        """Performs a traditional search for the query in files in the workspace."""
-        matches = []
-        try:
-            safe_directory = _safe_join(workspace, directory)
-            for dirpath, _, filenames in os.walk(safe_directory):
-                for filename in filenames:
-                    try:
-                        safe_file_path = _safe_join(workspace, os.path.join(dirpath, filename))
-                        with open(safe_file_path, 'r') as file:
-                            for line_number, line in enumerate(file):
-                                if query in line:
-                                    matched_line = f"{filename} (Line {line_number + 1}): {line.strip()}"
-                                    matches.append(matched_line)
-                                    if len(matches) >= 10:
-                                        return matches
-                    except Exception:
-                        continue
-            return matches
-        except Exception as e:
-            return [f"Error searching files: {str(e)}"]
-
-
-    @mcp_server.tool
-    def grep_text(workspace: str, pattern: str, top_k: int = -1) -> list:
+    def search_text_in_files(workspace: str, pattern: str, folder=".", top_k: int = -1) -> list:
         """Searches for a regex pattern in all text files in the workspace and returns up to top_k matches.
         Use top_k -1 to indicate that you want to find all matches."""
         matches = []
@@ -227,7 +203,7 @@ def build_mcp_server(config_path: str | None = None):
                 regex = re.compile(pattern, re.MULTILINE)
             except re.error as err:
                 return [f"Invalid regex pattern: {err}"]
-            root_dir = workspaces[workspace]
+            root_dir = _safe_join(workspace, folder)
             for dirpath, _, filenames in os.walk(root_dir):
                 for filename in filenames:
                     file_path = os.path.join(dirpath, filename)
@@ -240,11 +216,14 @@ def build_mcp_server(config_path: str | None = None):
                             for match in regex.finditer(text):
                                 # Find the line number where the match starts
                                 start_pos = match.start()
-                                # Count newlines before start_pos
-                                line_number = text.count('\n', 0, start_pos) + 1
+                                end_pos = match.end()
+                                # Count newlines before start_pos and ened_pos
+                                start_line = text.count('\n', 0, start_pos)
+                                end_line = text.count('\n', 0, end_pos)
                                 # Get the matched string (may be multiline)
-                                matched_str = match.group().replace('\n', ' ')
-                                matches.append(f"{file_path} (Line {line_number}): {matched_str}")
+                                matched_str = "\n".join(text.split("\n")[start_line:(end_line+1)])
+                                llm_file_path = file_path.replace(workspaces[workspace], ".")
+                                matches.append(f"{llm_file_path} (Line {start_line+1}-{end_line+1}):\n{matched_str}")
                                 if top_k > 0 and len(matches) >= top_k:
                                     return matches
                     except Exception:
