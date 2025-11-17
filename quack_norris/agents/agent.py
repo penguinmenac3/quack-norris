@@ -107,12 +107,12 @@ class SimpleAgent(Agent):
         if "{task}" in self._system_prompt:
             parameters["task"] = ToolParameter(
                 type="string",
-                description="The task to process. If not provided, the agent will extract the task from the chat history."
+                title="The task to process. If not provided, the agent will extract the task from the chat history."
             )
         if "{" + self._context_name + "}" in self._system_prompt:
             parameters[self._context_name] = ToolParameter(
                 type="string",
-                description="The context to use for the task. If not provided, the agent will extract the context from the chat history."
+                title="The context to use for the task. If not provided, the agent will extract the context from the chat history."
             )
         return parameters
 

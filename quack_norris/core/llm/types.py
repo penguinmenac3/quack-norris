@@ -12,9 +12,10 @@ class ChatContent(BaseModel):
     image_url: Optional[ImageURL] = None
 
 
-class ToolParameter(TypedDict):
+class ToolParameter(TypedDict, total=False):
     type: str
-    description: str
+    title: str
+    default: Optional[Any]
 
 
 class Tool(BaseModel):
