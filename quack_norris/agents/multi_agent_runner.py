@@ -18,7 +18,7 @@ class MultiAgentRunner:
         default_agent: str,
         agents: dict[str, Agent],
         tools: list[Tool],
-        max_steps: int = 5,
+        max_steps: int = 15,
     ):
         self._default_agent = default_agent
         self._agents = agents
