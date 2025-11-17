@@ -30,6 +30,7 @@ dev = [
 
 [project.scripts]
 quack-norris = "quack_norris.__main__:main"
+quack-norris-fs = "quack_norris.tools.filesystem_mcp:main"
 
 [build-system]
 requires = ["hatchling"]

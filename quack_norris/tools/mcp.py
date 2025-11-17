@@ -9,7 +9,14 @@ from quack_norris.logging import logger
 from quack_norris.core import Tool
 
 
-async def initialize_mcp_tools(mcp_configs: dict[str, Any]) -> list[Tool]:
+async def initialize_mcp_tools(mcp_configs: dict[str, Any], builtins: bool = True) -> list[Tool]:
+    if builtins:
+        mcp_configs["filesystem"] = {
+            "type": "http",
+            "url": "http://127.0.0.1:13370/mcp/",
+            "command": "quack-norris-fs",
+            "args": []
+        }
     # load tools from MCP servers
     tools: list[Tool] = []
     logger.info("Connecting to MCPs")

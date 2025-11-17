@@ -8,7 +8,6 @@ from quack_norris.core import ChatMessage, ModelProvider, OutputWriter
 from quack_norris.servers import serve_openai_api, ChatHandler
 from quack_norris.servers.proxy_chat_handler import make_proxy_handlers
 from quack_norris.agents import MultiAgentRunner
-from quack_norris.tools.filesystem import FileSystemTools
 
 
 def main():
@@ -74,10 +73,6 @@ def main():
     multi_agent_runner = MultiAgentRunner.from_config(config, config_path)
     handlers.update(multi_agent_runner.make_chat_handlers())
 
-    # Setup builtin tools
-    fs_tools = FileSystemTools(root_folder=args.workdir, is_list_allowed=True, is_read_allowed=True, is_write_allowed=False, is_delete_allowed=False)
-    multi_agent_runner.add_tools(fs_tools.list_tools(prefix="builtin."))
-
     if args.serve:
         logger.info("Starting server")
         serve_openai_api(handlers=handlers, port=11435)
@@ -125,6 +120,7 @@ async def cli_chat(handlers, agent: str, text: str, log_path: str):
             await chat_handler(history=list(history), output=output)
             history.append(ChatMessage(role="assistant", content=output.output_buffer))
             output.output_buffer = ""
+            print()
 
 
 if __name__ == "__main__":
