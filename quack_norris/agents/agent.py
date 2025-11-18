@@ -189,7 +189,7 @@ class SimpleAgent(Agent):
         await output.default("", separate=False)
 
         # Exit if we did not call a tool, so we can return the flow to the user
-        if len(response.tool_calls) == 0:
+        if len(response.tool_calls) == 0 and response.text.strip() != "":
             logger.info("Exiting runner: No tool call!")
             return True
         return False

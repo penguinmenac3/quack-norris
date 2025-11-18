@@ -43,6 +43,11 @@ class CustomToolCallingResponseStream(LLMResponse):
             for char in token:
                 if is_tool_call:
                     tool_calls += char
+                    # End tool call on double newline
+                    if char == "\n" and tool_calls[-1] == "\n":
+                        is_tool_call = False
+                        self._stream.close()
+                        break
                 elif char == "<":
                     if buffer != "":
                         yield buffer
@@ -78,20 +83,24 @@ class CustomToolCallingResponseStream(LLMResponse):
 
 def _parse_tool_calls(tool_calls: str, tools: list[Tool]) -> list[str | ToolCall]:
     out = []
-    for tool_call in tool_calls.split("[CALL]"):
+    for tool_call in tool_calls.split("\n\n"):
         if tool_call.strip() == "":
             continue
         try:
             spec = json.loads(tool_call)
             tool_name = spec["name"].lower()
-            args = spec["parameters"]
+            args = {}
+            if "parameters" in spec:
+                args = spec["parameters"]
         except Exception as e:
-            out.append(f"Failed to load tool call with the following error: `{e}`.\n\n"
-                       "Detected Toolcall:\n```\n{tool_call}\n```\n\n"
-                       "Possible reasons are:\n"
-                       "  - `Extra data`: You wrote somehting else after the tool call. The tool call has to be your last output.\n"
-                       "  - `Keyerror`: Your json object did not adhere to the format requiring `parameters` and `name` on top level.\n"
-                       "Make sure your message ends on a tool call with no text after it and that it adheres to the correct format.")
+            out.append(
+                f"Failed to load tool call with the following error: `{e}`.\n\n"
+                f"Detected Toolcall:\n```\n{tool_call}\n```\n\n"
+                "Possible reasons are:\n"
+                "  - `Extra data`: You wrote somehting else after the tool call. The tool call has to be your last output.\n"
+                "  - `Keyerror`: Your json object did not adhere to the format requiring `parameters` and `name` on top level.\n"
+                "Make sure your message ends on a tool call with no text after it and that it adheres to the correct format."
+            )
             continue
         found = False
         for tool in tools:

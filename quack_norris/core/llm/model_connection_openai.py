@@ -89,6 +89,16 @@ class OpenAIModelConnection(ModelConnector):
             messages = [
                 ChatMessage(role=msg.role, content=msg.text()) for msg in messages
             ]
+        if unofficial_toolcalling:
+            messages = [
+                ChatMessage(
+                    role="user",
+                    content="TOOL RESULT: " + msg.text(),
+                )
+                if msg.role == "tool"
+                else ChatMessage(role=msg.role, content=msg.content)
+                for msg in messages
+            ]
 
         try:
             if unofficial_toolcalling or len(tools) == 0:
