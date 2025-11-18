@@ -129,7 +129,11 @@ class SimpleAgent(Agent):
         current_tools = [
             tool
             for tool in available_tools
-            if _tool_matches(tool.name, self._tools) and tool.name != f"agent.{self._name}"
+            if _tool_matches(tool.name, self._tools)
+            and tool.name != f"agent.{self._name}"
+            and _tool_namespace_allowed(
+                tool.name, available_tools, f"agent.{self._name}"
+            )
         ]
         # logger.info(f"Tools (all) {[tool.name for tool in tools]}")
         # logger.info(f"Tools (current) {[tool.name for tool in current_tools]}")
@@ -202,3 +206,35 @@ def _tool_matches(tool_name: str, tool_filters: list[str]) -> bool:
         if filter_str.endswith("*") and tool_name.startswith(filter_str[:-1]):
             return True
     return False
+
+
+def _tool_namespace_allowed(
+    tool_name: str, available_tools: list[Tool], agent_name: str
+) -> bool:
+    # In all tools the tool with the `.__main__` closest to the tool_name defines
+    # the namespace limitation, e.g. `agent.code.__main__`` limits the namespace to
+    # `agent.code`, while `agent.code.agents.__main__` would limit the namespace to
+    # `agent.code.agents` for a tool with the name `agent.code.agents.new-agent-writer`
+
+    if tool_name.endswith(".__main__"):
+        # __main__ tools are always allowed
+        return True
+
+    # Find the closest (longest) namespace from available tools that end with .__main__
+    matched_namespace: str | None = None
+    for t in available_tools:
+        name = t.name
+        if not name.endswith(".__main__"):
+            continue
+        ns = name[: -len(".__main__")]
+        # ns matches tool_name if tool_name equals ns or starts with "ns."
+        if tool_name.startswith(ns):
+            if matched_namespace is None or len(ns) > len(matched_namespace):
+                matched_namespace = ns
+
+    # If no namespace restriction found, allow the tool
+    if matched_namespace is None:
+        return True
+
+    # The agent must be within the matched namespace to be allowed
+    return agent_name.startswith(matched_namespace)
