@@ -42,6 +42,8 @@ def build_mcp_server(config_path: str | None = None):
     # Helper function to safely join paths, accepting relative and absolute paths
     def _safe_join(workspace, sub_path):
         # If absolute, use as is, but check it's inside cwd
+        if workspace not in workspaces:
+            raise ValueError(f"Workspace '{workspace}' not found.")
         cwd = workspaces[workspace]
         if os.path.isabs(sub_path):
             abs_path = os.path.abspath(sub_path)
@@ -57,7 +59,8 @@ def build_mcp_server(config_path: str | None = None):
     @mcp_server.tool
     def list_workspaces() -> list:
         """Returns a list of workspace names, you always need to do this first.
-        All other functions require you to select a workspace."""
+        All other filesystem functions require you to select a workspace.
+        If the user does not explicitly state a workspace, check with this function which workspace matches best to the users intent."""
         return list(workspaces.keys())
 
 
