@@ -1,6 +1,6 @@
 # 🦆 Quack Norris - the code savy star 🌟 
 
-![picture of quack norris](images/quack-norris-2.0.png)
+![picture of quack norris](images/duck_low_res.png)
 
 Are you tired of spending hours ⏳ debugging your code, reading papers or writing e-mails? Look no further! Quack Norris 🦆 is here to save the day. This AImazing rubber duck will be your trusty AI companion 🤖, helping you tackle anything on your PC 💻.
 
