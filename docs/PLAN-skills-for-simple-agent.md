@@ -72,20 +72,8 @@ Refactor the `SimpleAgent` class to support modular skills. Skills will be defin
     - Use the `SkillRegistry` to load and validate the listed skills.
 - **Status**: Completed
 
-### 5. Create a Sample Skill
-- **Implementation Files**:
-  - Add a sample skill file: `~/.config/quack-norris/agents/make_code_readable.skill.md`.
-  - Example content:
-    ```yaml
-    ---
-    name: make_code_readable
-    description: A skill to improve code readability.
-    tools: code_formatter
-    ---
-    Rewrite the given code to make it more readable and maintainable.
-    ```
+### 5. Ensure Backward Compatibility
 
-### 6. Ensure Backward Compatibility
 - **Implementation Files**:
   - Modify `quack_norris/agents/agent.py`:
     - Ensure the `SimpleAgent` can function without skills if none are defined.
@@ -97,5 +85,5 @@ Refactor the `SimpleAgent` class to support modular skills. Skills will be defin
 - [ ] Skills are defined in `.skill.md` files and dynamically loaded.
 - [ ] The agent's system prompt includes the active skill's prompt.
 - [ ] Tools from the active skill are merged with the agent's tools.
-- [ ] A sample skill (`make_code_readable.skill.md`) is implemented.
+- [ ] A sample skill (`food-recommender.skill.md`) is implemented.
 - [ ] Existing agents remain functional without modification.
