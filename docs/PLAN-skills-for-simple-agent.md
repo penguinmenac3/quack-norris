@@ -54,6 +54,7 @@ Refactor the `SimpleAgent` class to support modular skills. Skills will be defin
       system_prompt + "\n\n" + skill_prompt
       ```
     - Merge the agent's tools with the active skill's tools.
+- **Status**: Completed
 
 ### 4. Update Metadata Parsing
 - **Implementation Files**:

@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, List, Optional
 import os
 import yaml
 import datetime
@@ -6,6 +6,7 @@ import uuid
 
 from quack_norris.logging import logger
 from quack_norris.core import Tool, ToolParameter, ToolCall, ChatMessage, ModelProvider, OutputWriter
+from quack_norris.agents.skill_registry import SkillRegistry
 
 
 class Agent(object):
@@ -32,13 +33,16 @@ class Agent(object):
 class SimpleAgent(Agent):
     def __init__(self, name: str, description: str, system_prompt: str, tools: List[str],
                  context_name: str = "context", model: str = "",
-                 system_prompt_last: bool = False):
+                 system_prompt_last: bool = False, skills: Optional[List[str]] = None):
         super().__init__(name, description)
         self._system_prompt = system_prompt
         self._tools = tools
         self._context_name = context_name
         self._model = model
         self._system_prompt_last = system_prompt_last
+        self._skills = skills or []
+        self._skill_registry = SkillRegistry(skill_directory="~/.config/quack-norris/agents/")
+        self._selected_skill = None  # Track the currently selected skill
 
     @staticmethod
     def from_folder(default_model: str, root_dir: str) -> dict[str, Agent]:
@@ -116,6 +120,23 @@ class SimpleAgent(Agent):
             )
         return parameters
 
+    def _make_skill_switch_tool(self, skill_name: str):
+        async def _callback(**args: dict):
+            if skill_name in self._skills:
+                self._selected_skill = skill_name
+                logger.info(f"Successfully switched to skill: `{skill_name}`")
+                return f"Successfully switched to skill: `{skill_name}`"
+            else:
+                logger.info(f"Failed to switch skill, unknown skill name: `{skill_name}`")
+                return f"Failed to switch skill, unknown skill name: `{skill_name}`"
+
+        return Tool(
+            name=f"switch_skill.{skill_name}",
+            description=f"Switch to the `{skill_name}` skill.",
+            parameters={},
+            tool_callable=_callback,
+        )
+
     async def chat(self, messages: list[ChatMessage], output: OutputWriter, available_tools: List[Tool], **kwargs) -> bool:
         kwargs["task"] = kwargs["task"] if "task" in kwargs else ""
         kwargs[self._context_name] = kwargs[self._context_name] if self._context_name in kwargs else ""
@@ -125,18 +146,27 @@ class SimpleAgent(Agent):
             kwargs["now"] = datetime.datetime.now().strftime("%A, %B %d, %Y, %H:%M:%S")
         system_prompt = self._system_prompt.format(**kwargs)
 
-        # Collect tools
+        # Create tools for switching skills
+        skill_switch_tools = [self._make_skill_switch_tool(skill) for skill in self._skills]
+
+        # Create a copy of self._tools and extend it with skill.tools
+        tools = list(self._tools)
+        if self._selected_skill:
+            skill = self._skill_registry.get_skill(self._selected_skill)
+            if skill:
+                system_prompt += f"\n\n{skill.prompt}"
+                tools.extend(skill.tools)
+
+        # Collect tools, filtering based on the extended_tools
         current_tools = [
             tool
-            for tool in available_tools
-            if _tool_matches(tool.name, self._tools)
+            for tool in available_tools + skill_switch_tools
+            if _tool_matches(tool.name, tools)
             and tool.name != f"agent.{self._name}"
             and _tool_namespace_allowed(
                 tool.name, available_tools, f"agent.{self._name}"
             )
         ]
-        # logger.info(f"Tools (all) {[tool.name for tool in tools]}")
-        # logger.info(f"Tools (current) {[tool.name for tool in current_tools]}")
 
         # Add limitations to agent what it does and encourage handover
         system_prompt += "\n\n"
