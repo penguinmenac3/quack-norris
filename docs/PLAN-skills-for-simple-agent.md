@@ -70,6 +70,7 @@ Refactor the `SimpleAgent` class to support modular skills. Skills will be defin
       Agent-specific prompt goes here.
       ```
     - Use the `SkillRegistry` to load and validate the listed skills.
+- **Status**: Completed
 
 ### 5. Create a Sample Skill
 - **Implementation Files**:

@@ -96,6 +96,12 @@ class SimpleAgent(Agent):
             tool_filters = []
 
         context_name = yaml_meta.get("context_name", "context").strip()
+        if "skills" in yaml_meta:
+            skills = yaml_meta.get("skills", "")
+            skills = [s.strip() for s in skills.split(",")]
+        else:
+            skills = []
+
         return SimpleAgent(
             name=name,
             description=description,
@@ -104,6 +110,7 @@ class SimpleAgent(Agent):
             context_name=context_name,
             model=model,
             system_prompt_last=system_prompt_last,
+            skills=skills,
         )
 
     def _get_parameters(self) -> dict[str, ToolParameter]:
