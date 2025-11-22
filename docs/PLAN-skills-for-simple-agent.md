@@ -32,6 +32,7 @@ Refactor the `SimpleAgent` class to support modular skills. Skills will be defin
     ---
     Skill-specific prompt goes here.
     ```
+- **Status**: Completed
 
 ### 2. Implement a Skill Registry
 - **Implementation Files**:
