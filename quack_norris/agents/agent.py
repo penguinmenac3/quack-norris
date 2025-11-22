@@ -154,7 +154,7 @@ class SimpleAgent(Agent):
         system_prompt = self._system_prompt.format(**kwargs)
 
         # Create tools for switching skills
-        skill_switch_tools = [self._make_skill_switch_tool(skill) for skill in self._skills]
+        skill_switch_tools = [self._make_skill_switch_tool(skill) for skill in self._skill_registry._skills.keys()]
 
         # Create a copy of self._tools and extend it with skill.tools
         tools = list(self._tools)
@@ -163,6 +163,7 @@ class SimpleAgent(Agent):
             if skill:
                 system_prompt += f"\n\n{skill.prompt}"
                 tools.extend(skill.tools)
+        tools.extend(f"switch_skill.{skill_name}" for skill_name in self._skills)
 
         # Collect tools, filtering based on the extended_tools
         current_tools = [

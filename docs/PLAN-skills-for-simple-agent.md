@@ -78,12 +78,15 @@ Refactor the `SimpleAgent` class to support modular skills. Skills will be defin
   - Modify `quack_norris/agents/agent.py`:
     - Ensure the `SimpleAgent` can function without skills if none are defined.
 
+- **Status**: Completed
+
 ## Acceptance Criteria
-- [ ] Skills are stored alongside `.agent.md` files.
-- [ ] A `SkillRegistry` class is implemented to manage skills.
-- [ ] The `SimpleAgent` class supports modular skills.
-- [ ] Skills are defined in `.skill.md` files and dynamically loaded.
-- [ ] The agent's system prompt includes the active skill's prompt.
-- [ ] Tools from the active skill are merged with the agent's tools.
-- [ ] A sample skill (`food-recommender.skill.md`) is implemented.
-- [ ] Existing agents remain functional without modification.
+
+- [x] Skills are stored alongside `.agent.md` files.
+- [x] A `SkillRegistry` class is implemented to manage skills.
+- [x] The `SimpleAgent` class supports modular skills.
+- [x] Skills are defined in `.skill.md` files and dynamically loaded.
+- [x] The agent's system prompt includes the active skill's prompt.
+- [x] Tools from the active skill are merged with the agent's tools.
+- [x] A sample skill (`food-recommender.skill.md`) is implemented.
+- [x] Existing agents remain functional without modification.
