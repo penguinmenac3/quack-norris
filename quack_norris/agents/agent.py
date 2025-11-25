@@ -1,15 +1,13 @@
-from typing import Callable, List, Optional
-import os
-import yaml
+from typing import Callable, List
 import datetime
 import uuid
 
 from quack_norris.logging import logger
 from quack_norris.core import Tool, ToolParameter, ToolCall, ChatMessage, ModelProvider, OutputWriter
-from quack_norris.agents.skill_registry import SkillRegistry
+from quack_norris.agents.skill_registry import Skill, get_skill, list_skills
 
 
-class Agent(object):
+class Agent:
     def __init__(self, name: str, description: str):
         self._name = name
         self._description = description
@@ -26,127 +24,53 @@ class Agent(object):
     def _get_parameters(self) -> dict[str, ToolParameter]:
         return {}
 
-    async def chat(self, messages: list[ChatMessage], output: OutputWriter, available_tools: List[Tool], **kwargs) -> bool:
+    async def chat(self, messages: list[ChatMessage], output: OutputWriter, available_tools: list[Tool], **kwargs) -> bool:
         raise RuntimeError("Must be implemented by child implementations!")
 
 
 class SimpleAgent(Agent):
-    def __init__(self, name: str, description: str, system_prompt: str, tools: List[str],
-                 context_name: str = "context", model: str = "",
-                 system_prompt_last: bool = False, skills: Optional[List[str]] = None):
+    def __init__(self, name: str, description: str, system_prompt: str,
+                 tools: List[str], skills: List[str],
+                 model: str, system_prompt_last: bool):
         super().__init__(name, description)
         self._system_prompt = system_prompt
         self._tools = tools
-        self._context_name = context_name
         self._model = model
-        self._system_prompt_last = system_prompt_last
         self._skills = skills or []
-        self._skill_registry = SkillRegistry(skill_directory="~/.config/quack-norris/agents/")
-        self._selected_skill = None  # Track the currently selected skill
+        self._system_prompt_last = system_prompt_last
 
-    @staticmethod
-    def from_folder(default_model: str, root_dir: str) -> dict[str, Agent]:
-        logger.info("Loading agents")
-        agents: dict[str, Agent] = {}
-        for base_dir, _, files in os.walk(root_dir):
-            for fname in files:
-                if fname.endswith(".agent.md"):
-                    file_path = os.path.join(base_dir, fname)
-                    rel_path = os.path.relpath(base_dir, root_dir)
-                    agent_name = rel_path.replace("/", ".").replace("\\", ".")
-                    agent_name = agent_name + "." + fname.replace(".agent.md", "")
-                    while agent_name.startswith("."):
-                        agent_name = agent_name[1:]
-                    try:
-                        agent = SimpleAgent.from_file(
-                            default_model, file_path, name=agent_name
-                        )
-                        agents[agent._name] = agent
-                    except Exception as e:
-                        logger.warning(f"Failed to load agent `{fname}` for reason {e}")
+    def _determine_skill(self, history: list[ChatMessage]) -> str | None:
+        skill = None
+        for message in history:
+            text = message.text()
+            if "Successfully switched to skill: `" in text:
+                for line in text.split("\n"):
+                    if "Successfully switched to skill: `" in line:
+                        skill = line.replace(
+                            "Successfully switched to skill: `", ""
+                        ).replace("`", "")
+        if skill not in list_skills().keys():
+            skill = None
+        logger.info(f"Active agent: `{skill}`")
+        return skill
 
-        logger.info(f"Loaded {len(agents.keys())} agents")
-        return agents
-
-    @staticmethod
-    def from_file(default_model: str, path: str, name: str="") -> "SimpleAgent":
-        with open(path, "r", encoding="utf-8") as f:
-            prompt = f.read()
-        parts = prompt.split("---")
-        if len(parts) < 3 or parts[0].strip() != "":
-            raise RuntimeError(
-                "Prompt must start with '---' followed by YAML metadata and another '---'."
-            )
-        system_prompt = "---".join(parts[2:]).strip()
-        meta = parts[1]
-        yaml_meta = yaml.safe_load(meta)
-        if name == "":
-            name = yaml_meta.get("name", "Agent").strip()
-        description = yaml_meta.get(
-            "description", "An agent that can process user queries and provide answers."
-        ).strip()
-        model = yaml_meta.get("model", "").strip()
-        if model == "":
-            model = default_model
-        system_prompt_last = bool(yaml_meta.get("system_prompt_last", False))
-        if "tools" in yaml_meta:
-            tool_filters = yaml_meta.get("tools", "")
-            tool_filters = [t.strip() for t in tool_filters.split(",")]
-        else:
-            tool_filters = []
-
-        context_name = yaml_meta.get("context_name", "context").strip()
-        if "skills" in yaml_meta:
-            skills = yaml_meta.get("skills", "")
-            skills = [s.strip() for s in skills.split(",")]
-        else:
-            skills = []
-
-        return SimpleAgent(
-            name=name,
-            description=description,
-            system_prompt=system_prompt,
-            tools=tool_filters,
-            context_name=context_name,
-            model=model,
-            system_prompt_last=system_prompt_last,
-            skills=skills,
-        )
-
-    def _get_parameters(self) -> dict[str, ToolParameter]:
-        parameters = {}
-        if "{task}" in self._system_prompt:
-            parameters["task"] = ToolParameter(
-                type="string",
-                title="The task to process. If not provided, the agent will extract the task from the chat history."
-            )
-        if "{" + self._context_name + "}" in self._system_prompt:
-            parameters[self._context_name] = ToolParameter(
-                type="string",
-                title="The context to use for the task. If not provided, the agent will extract the context from the chat history."
-            )
-        return parameters
-
-    def _make_skill_switch_tool(self, skill_name: str):
+    def _make_skill_switch_tool(self, skill: Skill):
         async def _callback(**args: dict):
-            if skill_name in self._skills:
-                self._selected_skill = skill_name
-                logger.info(f"Successfully switched to skill: `{skill_name}`")
-                return f"Successfully switched to skill: `{skill_name}`"
+            if skill.name in list_skills().keys():
+                logger.info(f"Successfully switched to skill: `{skill.name}`")
+                return f"Successfully switched to skill: `{skill.name}`"
             else:
-                logger.info(f"Failed to switch skill, unknown skill name: `{skill_name}`")
-                return f"Failed to switch skill, unknown skill name: `{skill_name}`"
+                logger.info(f"Failed to switch skill, unknown skill name: `{skill.name}`")
+                return f"Failed to switch skill, unknown skill name: `{skill.name}`"
 
         return Tool(
-            name=f"switch_skill.{skill_name}",
-            description=f"Switch to the `{skill_name}` skill.",
+            name=f"switch_skill.{skill.name}",
+            description=f"Select the `{skill.name}` skill: {skill.description}",
             parameters={},
             tool_callable=_callback,
         )
 
     async def chat(self, messages: list[ChatMessage], output: OutputWriter, available_tools: List[Tool], **kwargs) -> bool:
-        kwargs["task"] = kwargs["task"] if "task" in kwargs else ""
-        kwargs[self._context_name] = kwargs[self._context_name] if self._context_name in kwargs else ""
         if "{today}" in self._system_prompt:
             kwargs["today"] = datetime.datetime.now().strftime("%A, %B %d, %Y")
         if "{now}" in self._system_prompt:
@@ -154,22 +78,23 @@ class SimpleAgent(Agent):
         system_prompt = self._system_prompt.format(**kwargs)
 
         # Create tools for switching skills
-        skill_switch_tools = [self._make_skill_switch_tool(skill) for skill in self._skill_registry._skills.keys()]
+        skill_switch_tools = [self._make_skill_switch_tool(skill) for skill in list_skills().values()]
 
         # Create a copy of self._tools and extend it with skill.tools
-        tools = list(self._tools)
-        if self._selected_skill:
-            skill = self._skill_registry.get_skill(self._selected_skill)
+        tool_filters = list(self._tools)
+        selected_skill = self._determine_skill(messages)
+        if selected_skill:
+            skill = get_skill(selected_skill)
             if skill:
                 system_prompt += f"\n\n{skill.prompt}"
-                tools.extend(skill.tools)
-        tools.extend(f"switch_skill.{skill_name}" for skill_name in self._skills)
+                tool_filters.extend(skill.tools)
+        tool_filters.extend(f"switch_skill.{skill_name}" for skill_name in self._skills)
 
         # Collect tools, filtering based on the extended_tools
         current_tools = [
             tool
             for tool in available_tools + skill_switch_tools
-            if _tool_matches(tool.name, tools)
+            if _tool_matches(tool.name, tool_filters)
             and tool.name != f"agent.{self._name}"
             and _tool_namespace_allowed(
                 tool.name, available_tools, f"agent.{self._name}"

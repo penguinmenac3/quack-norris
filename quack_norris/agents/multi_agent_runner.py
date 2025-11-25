@@ -1,7 +1,5 @@
-
 from typing import Any
 import os
-import shutil
 import asyncio
 
 from quack_norris.logging import logger
@@ -9,19 +7,18 @@ from quack_norris.core import ChatMessage, Tool, OutputWriter
 from quack_norris.servers import ChatHandler
 from quack_norris.tools.mcp import initialize_mcp_tools
 
-from quack_norris.agents.agent import Agent, SimpleAgent
+from quack_norris.agents.skill_registry import load_and_watch_skills
+from quack_norris.agents.agent_registry import set_default_agent_llm, load_and_watch_agents, list_agents, get_agent
 
 
 class MultiAgentRunner:
     def __init__(
         self,
         default_agent: str,
-        agents: dict[str, Agent],
         tools: list[Tool],
         max_steps: int = 15,
     ):
         self._default_agent = default_agent
-        self._agents = agents
         self._tools = tools
         self._max_steps = max_steps
 
@@ -38,32 +35,19 @@ class MultiAgentRunner:
                 f"No MCP servers configured. Add a `mcps` section to `{config_path}` to configure them."
             )
 
-        # Check if default agent exists, if not use the default.auto.agent.md to create it
+        # Load agents and skills
         agents_path = os.path.join(os.path.dirname(config_path), "agents")
-        here = os.path.dirname(__file__)
-        default_agent_src = os.path.join(here, "_default.auto.agent.md")
-        default_agent_dst = os.path.join(agents_path, "auto.agent.md")
-        if not os.path.exists(default_agent_dst):
-            os.makedirs(agents_path, exist_ok=True)
-            if os.path.exists(default_agent_src):
-                shutil.copyfile(default_agent_src, default_agent_dst)
-                logger.info(f"Copied default agent to {default_agent_dst}")
-            else:
-                logger.warning(
-                    f"WARNING: Default agent file not found at {default_agent_src}"
-                )
-
-        # Load agents from md files in all subdirectories
-        default_model = config.get("default_model", "gemma3:12b")
-        agents = SimpleAgent.from_folder(default_model, agents_path)
-        return MultiAgentRunner(default_agent="auto", agents=agents, tools=tools)
+        set_default_agent_llm(config.get("default_model", "gemma3:12b"))
+        load_and_watch_agents(agents_path)
+        load_and_watch_skills(agents_path)
+        return MultiAgentRunner(default_agent="auto", tools=tools)
 
     def add_tools(self, tools: list[Tool]):
         for tool in tools:
             if tool not in self._tools:
                 self._tools.append(tool)
 
-    def _determine_agent(self, history: list[ChatMessage], agent: str) -> str:
+    def _determine_agent(self, history: list[ChatMessage]) -> str:
         agent = self._default_agent
         for message in history:
             text = message.text()
@@ -73,7 +57,7 @@ class MultiAgentRunner:
                         agent = line.replace(
                             "Successfully switched to agent: `", ""
                         ).replace("`", "")
-        if agent not in self._agents.keys():
+        if agent not in list_agents().keys():
             agent = self._default_agent
         logger.info(f"Active agent: `{agent}`")
         return agent
@@ -88,7 +72,7 @@ class MultiAgentRunner:
 
             return _handle_chat
     
-        return {f"agent.{k}": _make_handler(k) for k in self._agents.keys()}
+        return {f"agent.{k}": _make_handler(k) for k in list_agents().keys()}
 
     async def chat(
         self, messages: list[ChatMessage], output: OutputWriter, agent_name: str = ""
@@ -103,7 +87,7 @@ class MultiAgentRunner:
                 async def _callback(**args: dict):
                     nonlocal agent_name
                     nonlocal kwargs
-                    if agent in self._agents.keys():
+                    if agent in list_agents().keys():
                         agent_name = agent
                         kwargs = args
                         logger.info(f"Successfully switched to agent: `{agent}`")
@@ -116,15 +100,15 @@ class MultiAgentRunner:
 
                 return _callback
 
-            agent_name = self._determine_agent(messages, agent_name)
+            agent_name = self._determine_agent(messages)
             tools += [
                 agent.fill_tool_description(_switch_tool(key))
-                for key, agent in self._agents.items()
+                for key, agent in list_agents().items()
             ]
 
         for step in range(max(self._max_steps, 1)):
             current_tools: list[Tool] = tools if step < self._max_steps - 1 else []
-            is_done: bool = await self._agents[agent_name].chat(
+            is_done: bool = await get_agent(agent_name).chat(
                 messages, output, current_tools, **kwargs
             )
             if is_done:

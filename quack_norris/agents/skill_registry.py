@@ -4,6 +4,8 @@ from typing import Dict, Optional, NamedTuple
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+from quack_norris.logging import logger
+
 
 class Skill(NamedTuple):
     name: str
@@ -12,86 +14,85 @@ class Skill(NamedTuple):
     prompt: str
 
 
-class SkillRegistry:
-    def __init__(self, skill_directory: str):
-        self._skill_directory = skill_directory
-        self._skills: Dict[str, Skill] = {}
-        self._observer = Observer()
-        self._start_watching()
-        self._load_skills()
+_skills: Dict[str, Skill] = {}
 
-    def _start_watching(self):
-        """Start watching the skill directory for changes."""
-        event_handler = _SkillFileChangeHandler(self)
-        self._observer.schedule(event_handler, self._skill_directory, recursive=True)
-        self._observer.start()
 
-    def _load_skills(self):
-        """Load all skills from the skill directory."""
-        for root, _, files in os.walk(self._skill_directory):
-            for file in files:
-                if file.endswith(".skill.md"):
-                    skill_path = os.path.join(root, file)
-                    self._load_skill_from_file(skill_path)
+## API
+def load_and_watch_skills(skill_directory: str):
+    """Start watching the skill directory for changes."""
+    # Load the skills
+    for root, _, files in os.walk(skill_directory):
+        for file in files:
+            if file.endswith(".skill.md"):
+                skill_path = os.path.join(root, file)
+                _load_skill_from_file(skill_path, skill_directory)
+    # Watch for changes
+    _observer = Observer()
+    _observer.schedule(_SkillFileChangeHandler(skill_directory), skill_directory, recursive=True)
+    _observer.start()
 
-    def _load_skill_from_file(self, path: str):
-        """Load a single skill from a .skill.md file."""
+
+def list_skills() -> dict[str, Skill]:
+    """List all skills in the registry."""
+    return _skills
+
+
+def get_skill(name: str) -> Optional[Skill]:
+    """Retrieve a skill by name."""
+    return _skills.get(name)
+
+
+## Internals
+def _load_skill_from_file(path: str, skill_directory: str):
+    """Load a single skill from a .skill.md file."""
+    try:
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
+
         parts = content.split("---")
-        if len(parts) < 3:
-            raise ValueError(f"Invalid skill file format: {path}")
+        if len(parts) < 3 or parts[0].strip() != "":
+            raise ValueError(f"Invalid skill file format. Expected YAML metadata enclosed by '---'. Error in: {path}")
+
         metadata = yaml.safe_load(parts[1])
         prompt = "---".join(parts[2:]).strip()
 
-        # Determine skill name with folder prefix
-        rel_path = os.path.relpath(path, self._skill_directory)
-        folder_prefix = os.path.dirname(rel_path).replace(os.sep, ".")
-        base_name = os.path.basename(path).replace(".skill.md", "")
-        skill_name = metadata.get("name", base_name)
-        if folder_prefix:
-            skill_name = f"{folder_prefix}.{skill_name}"
-
-        skill = Skill(
+        skill_name = _derive_skill_name(path, skill_directory)
+        _skills[skill_name] = Skill(
             name=skill_name,
             description=metadata.get("description", ""),
             tools=metadata.get("tools", []),
             prompt=prompt,
         )
-        self._skills[skill.name] = skill
+    except Exception as e:
+        logger.warning(f"Cannot load skill `{path}`. Error occured: {e}")
 
-    def get_skill(self, name: str) -> Optional[Skill]:
-        """Retrieve a skill by name."""
-        return self._skills.get(name)
 
-    def stop_watching(self):
-        """Stop the file observer."""
-        self._observer.stop()
-        self._observer.join()
+def _derive_skill_name(file_path: str, skill_directory: str) -> str:
+    """Get the agent name based on the file path relative to the agent directory."""
+    name = os.path.relpath(file_path, skill_directory)
+    return name.replace("/", ".").replace("\\", ".").replace(".skill.md", "")
+
+
+def _unload_skill_from_file(file_path: str, skill_directory: str):
+    """Remove a skill based on its file path."""
+    del _skills[_derive_skill_name(file_path, skill_directory)]
 
 
 class _SkillFileChangeHandler(FileSystemEventHandler):
-    def __init__(self, registry: SkillRegistry):
-        self.registry = registry
+    def __init__(self, skill_directory: str):
+        self._skill_directory = skill_directory
 
     def on_modified(self, event):
-        if not isinstance(event.src_path, str):
-            raise NotImplementedError("Only str paths supported!")
-        if event.src_path.endswith(".skill.md"):
-            self.registry._load_skill_from_file(event.src_path)
+        if isinstance(event.src_path, str) and event.src_path.endswith(".skill.md"):
+            _load_skill_from_file(event.src_path, self._skill_directory)
+            logger.info(f"Skill added: {event.src_path}")
 
     def on_created(self, event):
-        if not isinstance(event.src_path, str):
-            raise NotImplementedError("Only str paths supported!")
-        if event.src_path.endswith(".skill.md"):
-            self.registry._load_skill_from_file(event.src_path)
+        if isinstance(event.src_path, str) and event.src_path.endswith(".skill.md"):
+            _load_skill_from_file(event.src_path, self._skill_directory)
+            logger.info(f"Skill updated: {event.src_path}")
 
     def on_deleted(self, event):
-        if not isinstance(event.src_path, str):
-            raise NotImplementedError("Only str paths supported!")
-        if event.src_path.endswith(".skill.md"):
-            rel_path = os.path.relpath(event.src_path, self.registry._skill_directory)
-            folder_prefix = os.path.dirname(rel_path).replace(os.sep, ".")
-            base_name = os.path.basename(event.src_path).replace(".skill.md", "")
-            skill_name = f"{folder_prefix}.{base_name}" if folder_prefix else base_name
-            self.registry._skills.pop(skill_name, None)
+        if isinstance(event.src_path, str) and event.src_path.endswith(".skill.md"):
+            _unload_skill_from_file(event.src_path, self._skill_directory)
+            logger.info(f"Skill removed: {event.src_path}")
