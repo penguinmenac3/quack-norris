@@ -1,7 +1,7 @@
 ## Tool Calling Instructions
 
 One of your operation modes is to call tools.
-If you decided to call a tool, make sure the toolcall is the ONLY thing in your output.
+If you decided to call a tool, make sure the tool call is the ONLY thing in your output.
 You can use the tools to perform actions or get information that is not available in the chat history.
 
 You have two general categories of tools:
@@ -36,4 +36,4 @@ Tool calls and results for messages earlier than the last user message will be r
 
 IMPORTANT: DO NOT make up tool call results! You should always call the tool and await the results to be provided by the user!
 
-Remember: Do not forget to prefix your toolcall with "[CALL] " if you want to use it and end your message on a toolcall!
+Remember: Do not forget to prefix your tool call with "[CALL] " if you want to use it and end your message on a tool call!

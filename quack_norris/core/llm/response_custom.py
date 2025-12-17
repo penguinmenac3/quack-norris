@@ -34,49 +34,56 @@ class CustomToolCallingResponseStream(LLMResponse):
         tool_calls: str = ""
         buffer: str = ""
         self._raw_text = ""
-        for chunk in self._stream:
-            if len(chunk.choices) == 0:
-                continue
-            token = chunk.choices[0].delta.content or ""
-            self._raw_text += token  # Collect full text
-            token_buffer: str = ""
-            for char in token:
-                if is_tool_call:
-                    tool_calls += char
-                    # End tool call on double newline
-                    if char == "\n" and tool_calls[-1] == "\n":
-                        is_tool_call = False
-                        self._stream.close()
-                        break
-                elif char == "<":
-                    if buffer != "":
-                        yield buffer
-                    buffer = char
-                elif char == "[" and not is_thinking:
-                    if buffer != "":
-                        yield buffer
-                    buffer = char
-                elif buffer != "":
-                    if char in [">", "]", " ", "\n", "\t"]:
-                        word: str = buffer + char
-                        buffer = ""
-                        if word == "<think>":
-                            is_thinking = True
-                        if word == "</think>":
-                            is_thinking = False
-                        if not is_thinking and word == "[CALL]" and len(self._tools) > 0:
-                            is_tool_call = True
-                            word = ""
-                        if word != "":
-                            yield word
+        try:
+            for chunk in self._stream:
+                if len(chunk.choices) == 0:
+                    continue
+                token = chunk.choices[0].delta.content or ""
+                self._raw_text += token  # Collect full text
+                token_buffer: str = ""
+                for char in token:
+                    if is_tool_call:
+                        tool_calls += char
+                        # End tool call on double newline
+                        if char == "\n" and tool_calls[-1] == "\n":
+                            is_tool_call = False
+                            self._stream.close()
+                            break
+                    elif char == "<":
+                        if buffer != "":
+                            yield buffer
+                        buffer = char
+                    elif char == "[" and not is_thinking:
+                        if buffer != "":
+                            yield buffer
+                        buffer = char
+                    elif buffer != "":
+                        if char in [">", "]", " ", "\n", "\t"]:
+                            word: str = buffer + char
+                            buffer = ""
+                            if word == "<think>":
+                                is_thinking = True
+                            if word == "</think>":
+                                is_thinking = False
+                            if (
+                                not is_thinking
+                                and word == "[CALL]"
+                                and len(self._tools) > 0
+                            ):
+                                is_tool_call = True
+                                word = ""
+                            if word != "":
+                                yield word
+                        else:
+                            buffer += char
                     else:
-                        buffer += char
-                else:
-                    token_buffer += char
-            if token_buffer != "":
-                yield token_buffer
-        if buffer != "":
-            yield buffer
+                        token_buffer += char
+                if token_buffer != "":
+                    yield token_buffer
+            if buffer != "":
+                yield buffer
+        except Exception as e:
+            yield f"\n\n[Error during streaming response: {e}]\n\n"
 
         self._tool_calls = _parse_tool_calls(tool_calls.strip(), self._tools)
 
@@ -95,9 +102,9 @@ def _parse_tool_calls(tool_calls: str, tools: list[Tool]) -> list[str | ToolCall
         except Exception as e:
             out.append(
                 f"Failed to load tool call with the following error: `{e}`.\n\n"
-                f"Detected Toolcall:\n```\n{tool_call}\n```\n\n"
+                f"Detected tool call:\n```\n{tool_call}\n```\n\n"
                 "Possible reasons are:\n"
-                "  - `Extra data`: You wrote somehting else after the tool call. The tool call has to be your last output.\n"
+                "  - `Extra data`: You wrote something else after the tool call. The tool call has to be your last output.\n"
                 "  - `Keyerror`: Your json object did not adhere to the format requiring `parameters` and `name` on top level.\n"
                 "Make sure your message ends on a tool call with no text after it and that it adheres to the correct format."
             )

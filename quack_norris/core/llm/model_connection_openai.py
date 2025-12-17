@@ -63,7 +63,8 @@ class OpenAIModelConnection(ModelConnector):
         remove_thoughts: bool = True,
         stream: bool = True,
     ) -> LLMResponse:
-        unofficial_toolcalling = self._config.get("unofficial_toolcalling", False)
+        # Check if the model is in the list of models that require unofficial tool calling
+        unofficial_toolcalling = model in self._config.get("unofficial_toolcalling", [])
 
         messages = messages_to_openai(messages, remove_thoughts)
         if len(tools) > 0 and unofficial_toolcalling:
