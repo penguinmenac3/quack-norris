@@ -104,10 +104,14 @@ class SimpleAgent(Agent):
         ]
 
         # Add limitations to agent what it does and encourage handover
-        system_prompt += "\n\n"
+        system_prompt += "\n\n## Final Remarks\n"
+        system_prompt += "* You are an expert in your field and only answer questions related to your expertise and role.\n"
         if len(current_tools) > 0:
-            system_prompt += "Final note, if you think a question / task is not in your competence call the agent better suited for it. If no agent matches the `agent.auto` is the front desk taking care of it.\n"
-        system_prompt += "If you cannot answer a question, because it does not fit to your job and you cannot give it to another agent. Let the user politely know."
+            system_prompt += "* If the user asks something outside your expertise, hand it over to another agent.\n"
+            system_prompt += "* If you do not know the right agent, `agent.auto` will be able to route it or handle the request.\n"
+            system_prompt += "* You have skills, which give you information on how to do things better. You can always have one skill active. Make use of it.\n"
+            system_prompt += "* Additionally, you can have access to tools to help you with your job.\n"
+        system_prompt += "* If you cannot answer a question, because it does not fit to your role and you cannot give it to another agent. Let the user politely know."
 
         # Send request to LLM
         llm = ModelProvider.get_llm(self._model)
