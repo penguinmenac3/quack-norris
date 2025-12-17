@@ -78,12 +78,18 @@ def _load_agent_from_file(file_path: str, agent_directory: str):
         system_prompt = "---".join(parts[2:]).strip()
 
         name = _derive_agent_name(file_path, agent_directory)
+        tools = metadata.get("tools", [])
+        if isinstance(tools, str):
+            tools = [s.strip() for s in tools.split(",")]
+        skills = metadata.get("skills", [])
+        if isinstance(skills, str):
+            skills = [s.strip() for s in skills.split(",")]
         _agents[name] = SimpleAgent(
             name=name,
             description=metadata.get("description", "No description provided."),
             system_prompt=system_prompt,
-            tools=metadata.get("tools", []),
-            skills=metadata.get("skills", []),
+            tools=tools,
+            skills=skills,
             model=metadata.get("model", _default_model),
             system_prompt_last=metadata.get("system_prompt_last", False),
         )

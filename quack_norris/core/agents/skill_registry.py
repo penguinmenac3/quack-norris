@@ -57,10 +57,13 @@ def _load_skill_from_file(path: str, skill_directory: str):
         prompt = "---".join(parts[2:]).strip()
 
         skill_name = _derive_skill_name(path, skill_directory)
+        tools = metadata.get("tools", [])
+        if isinstance(tools, str):
+            tools = [s.strip() for s in tools.split(",")]
         _skills[skill_name] = Skill(
             name=skill_name,
             description=metadata.get("description", ""),
-            tools=metadata.get("tools", []),
+            tools=tools,
             prompt=prompt,
         )
     except Exception as e:
