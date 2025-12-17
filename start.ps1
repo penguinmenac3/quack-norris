@@ -1,1 +1,1 @@
-uvw run quack-norris --serve
+uvw run quack-norris
