@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 
-from quack_norris.tools.ask_user_consent import ask_user_consent
+from quack_norris.core.tools.ask_user_consent import ask_user_consent
 
 
 SUPPORTED_TXT_FILES = ['.txt', '.md', '.py', '.json', '.yaml', '.yml', '.csv', '.ini', '.cfg', '.toml', '.js', '.ts', '.html', '.css']

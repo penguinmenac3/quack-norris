@@ -87,7 +87,11 @@ export class ChatMessageComponent extends Module<HTMLDivElement> {
 
     public constructor(message: ChatMessage) {
         super("div", "", "message-container")
-        this.modelDiv = new Module<HTMLDivElement>("div", message.getRole(), "model")
+        let role = message.getRole()
+        if (role.startsWith("local/")) {
+            role = role.replace("local/", "")
+        }
+        this.modelDiv = new Module<HTMLDivElement>("div", role, "model")
         this.add(this.modelDiv)
         if (message.getRole() == "user") {
             this.modelDiv.hide()

@@ -1,11 +1,12 @@
 import "./chatInput.css"
-import { iconCall, iconMicrophone, iconPlus, iconSend, iconTool, iconWeb, iconBook, iconTrash } from "../../icons";
+import { iconCall, iconMicrophone, iconPlus, iconSend, iconAIModel, iconDropdown, iconTrash } from "../../icons";
 import { Module } from "../../webui/module";
-import { ActionButton } from "../../webui/components/buttons";
+import { ActionButton, DropdownButton } from "../../webui/components/buttons";
 import { ExitablePopup } from "../../webui/components/popup";
 import { FormInput, FormSubmit } from "../../webui/components/form";
 import { Conversation, ConversationListener } from "../logic/conversation";
 import { ConversationManager, ConversationManagerListener } from "../logic/conversationManager";
+import { Connection } from "../logic/connection";
 
 export class ChatInputComponent extends Module<HTMLDivElement> {
     private input: Module<HTMLTextAreaElement>
@@ -24,20 +25,69 @@ export class ChatInputComponent extends Module<HTMLDivElement> {
         let toolbar = new Module<HTMLDivElement>("div", "", "tool-bar")
         let addMedia = new ActionButton(iconPlus)
         toolbar.add(addMedia)
-        let tools = new Module<HTMLSpanElement>("span", "", "fill-width")
-        let web_search = new ActionButton(iconWeb + " Web")
-        web_search.setClass("with-text")
-        tools.add(web_search)
-        // let code = new ActionButton(iconTerminal + " Code")
-        // code.setClass("with-text")
-        // tools.add(code)
-        let rag = new ActionButton(iconBook + " RaG")
-        rag.setClass("with-text")
-        tools.add(rag)
-        let extra_tools = new ActionButton(iconTool + " Tools")
-        extra_tools.setClass("with-text")
-        tools.add(extra_tools)
-        toolbar.add(tools)
+        let quick_settings = new Module<HTMLSpanElement>("span", "", "fill-width")
+        let model_selector = new DropdownButton(iconAIModel + " loading... " + iconDropdown, null, true)
+        function setModel(model: string) {
+            model = model.split("/").splice(1).join("/")
+            model_selector.htmlElement.innerHTML = iconAIModel + " " + model + " " + iconDropdown
+        }
+        let initial_conversation = ConversationManager.getCurrentConversation()
+        if (initial_conversation) {
+            setModel(initial_conversation.getModel())
+        }
+        model_selector.onAction = async () => {
+            let models = await Connection.getInstance().getModels()
+            let actions = new Map<string, CallableFunction>()
+            for (let model of models) {
+                let display_model = model
+                if (display_model.startsWith("local/")) {
+                    display_model = display_model.replace("local/", "")
+                }
+                actions.set(display_model, async () => {
+                    let conversation = ConversationManager.getCurrentConversation()
+                    let workspaces = await Connection.getInstance().getWorkspaces(model)
+                    if (conversation) {
+                        conversation.setModel(model)
+                        setModel(model)
+                        if (!workspaces.includes(conversation.getWorkspace())) {
+                            conversation.setWorkspace("")
+                        }
+                    }
+                    return true
+                })
+            }
+            model_selector.showMenu(actions)
+        }
+        quick_settings.add(model_selector)
+        let workspace_selector = new DropdownButton("loading... " + iconDropdown, null, true)
+        function setWorkspace(workspace: string) {
+            if (workspace == "") {
+                workspace = "(none)"
+            }
+            workspace_selector.htmlElement.innerHTML = " " + workspace + " " + iconDropdown
+        }
+        if (initial_conversation) {
+            setWorkspace(initial_conversation.getWorkspace())
+        }
+        workspace_selector.onAction = async () => {
+            let conversation = ConversationManager.getCurrentConversation()
+            if (conversation) {
+                let workspaces = await Connection.getInstance().getWorkspaces(conversation.getModel())
+                workspaces.unshift("") // add none option
+                let actions = new Map<string, CallableFunction>()
+                for (let workspace of workspaces) {
+                    let workspace_display = workspace != "" ? workspace : "(none)"
+                    actions.set(workspace_display, () => {
+                        conversation.setWorkspace(workspace)
+                        setWorkspace(workspace)
+                        return true
+                    })
+                }
+                workspace_selector.showMenu(actions)
+            }
+        }
+        quick_settings.add(workspace_selector)
+        toolbar.add(quick_settings)
         let microphone = new ActionButton(iconMicrophone)
         toolbar.add(microphone)
         this.call = new ActionButton(iconCall)
@@ -168,6 +218,7 @@ export class ChatInputComponent extends Module<HTMLDivElement> {
         let listener = new ConversationManagerListener()
         listener.onConversationSelected = (_id: string, conversation: Conversation) => {
             this.registerConversationListener(conversation);
+            setModel(conversation.getModel())
         }
     }
 

@@ -1,17 +1,35 @@
-import asyncio
 import argparse
 import os
-import json
 
+from quack_norris.api.server import serve_openai_api
+from quack_norris.api.cli import cli_chat
+from quack_norris.core.llm.model_provider import ModelProvider
+from quack_norris.core.llm.proxy_chat_handler import ProxyChatHandlerProvider
+from quack_norris.core.agents.multi_agent_runner import MultiAgentRunner
+from quack_norris.config import Config
 from quack_norris.logging import logger, log_only_warn
-from quack_norris.core import ChatMessage, ModelProvider, OutputWriter
-from quack_norris.servers import serve_openai_api, ChatHandler
-from quack_norris.servers.proxy_chat_handler import make_proxy_handlers
-from quack_norris.agents import MultiAgentRunner
+from quack_norris.ui.app import create_ui
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="config.json",
+        help="Name of the config to use (must be in cwd, ~/.config/quack_norris/, or PATH_TO_CODE/quack_norris/configs).",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="If you want to enable debug mode.",
+    )
+    parser.add_argument(
+        "--workdir",
+        type=str,
+        default=os.curdir,
+        help="A folder to which the llm has access.",
+    )
     parser.add_argument(
         "--serve",
         action="store_true",
@@ -30,97 +48,37 @@ def main():
         help="If you want to log the output also into a file, set this to the path.",
     )
     parser.add_argument(
-        "--workdir",
-        type=str,
-        default=os.curdir,
-        help="A folder to which the llm has access.",
-    )
-    parser.add_argument(
         "--agent",
         type=str,
         default="agent.auto",
         help="Specify the agent that should be used. Note the prefix 'agent.*' is required. You can also use llms with 'proxy.*'.",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    if not args.serve:
-        log_only_warn()
 
-    # Define paths
-    config_path = os.path.join(
-        os.path.expanduser("~"), ".config", "quack-norris", "config.json"
-    )
+def main():
+    args = parse_args()
+    if args.input != "":
+        log_only_warn()  # Reduce logging for single input mode
 
-    # Read the config
-    logger.info("Loading config")
-    config = {}
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            config = json.load(f)
-    else:
-        logger.error(f"No config found. Create a `{config_path}`.")
-        exit(1)
+    if args.workdir != os.curdir:
+        logger.info(f"Changing working directory to `{args.workdir}`")
+        os.chdir(args.workdir)
 
-    # Setup LLMs
-    logger.info("Initializing LLMs")
-    ModelProvider.load_config(config.get("llms", None))
-
-    # Setup Chat
-    handlers: dict[str, ChatHandler] = {}
-    logger.info("Creating Proxies")
-    handlers.update(make_proxy_handlers(config))
-    logger.info("Creating Agents")
-    multi_agent_runner = MultiAgentRunner.from_config(config, config_path)
-    handlers.update(multi_agent_runner.make_chat_handlers())
-
+    config = Config(args.config, overwrites={"debug": args.debug})
+    logger.warning(f"Using config {config}")
     if args.serve:
-        logger.info("Starting server")
-        serve_openai_api(handlers=handlers, port=11435)
+        ModelProvider.initialize(config)
+        ProxyChatHandlerProvider.setup_from_config(config)
+        MultiAgentRunner.setup_from_config(config)
+        serve_openai_api(config=config, port=11435)
+    elif args.input != "":
+        ModelProvider.initialize(config)
+        ProxyChatHandlerProvider.setup_from_config(config)
+        MultiAgentRunner.setup_from_config(config)
+        cli_chat(args.agent, args.input, args.output)
     else:
-        asyncio.run(cli_chat(handlers, args.agent, args.input, args.output))
-
-
-async def cli_chat(handlers, agent: str, text: str, log_path: str):
-    if agent not in handlers:
-        agent_names = "\n  -".join([""] + list(handlers.keys()))
-        logger.error(
-            f"The selected agent is not a valid choice.\n  Select from:{agent_names}"
-        )
-        exit(22)  # Invalid argument
-    chat_handler = handlers[agent]
-    output = OutputWriter()
-    history = []
-    if text != "":
-        if os.path.isfile(text):
-            with open (text, "r", encoding="utf-8") as f:
-                text = f.read()
-        history.append(ChatMessage(role="user", content=text))
-        await chat_handler(history=history, output=output)
-        if log_path != "":
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(output.output_buffer)
-    else:
-        while True:
-            text = ""
-            while True:
-                try:
-                    line = input("> ")
-                except EOFError or KeyboardInterrupt:
-                    print("CTRL+C Exiting")
-                    exit(0)
-                if line == "/exit":
-                    print("Exiting")
-                    exit(0)
-                if line.endswith("\\"):
-                    text += line[:-1] + "\n"
-                else:
-                    text += line
-                    break
-            history.append(ChatMessage(role="user", content=text))
-            await chat_handler(history=list(history), output=output)
-            history.append(ChatMessage(role="assistant", content=output.output_buffer))
-            output.output_buffer = ""
-            print()
+        create_ui(config)
 
 
 if __name__ == "__main__":

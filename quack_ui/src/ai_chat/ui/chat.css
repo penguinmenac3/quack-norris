@@ -18,6 +18,17 @@
     display: flex;
 }
 
+.chat .main-header {
+    font-size: 1.2em;
+    font-weight: bold;
+    justify-content: center;
+    align-items: center;
+}
+.chat .centered-text {
+    justify-content: center;
+    align-items: center;
+}
+
 .chat .dropdown {
     display: flex;
     justify-content: center;

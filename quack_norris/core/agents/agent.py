@@ -3,8 +3,10 @@ import datetime
 import uuid
 
 from quack_norris.logging import logger
-from quack_norris.core import Tool, ToolParameter, ToolCall, ChatMessage, ModelProvider, OutputWriter
-from quack_norris.agents.skill_registry import Skill, get_skill, list_skills
+from quack_norris.core.agents.skill_registry import Skill, get_skill, list_skills
+from quack_norris.core.llm.types import Tool, ToolParameter, ToolCall, ChatMessage
+from quack_norris.core.llm.model_provider import ModelProvider
+from quack_norris.core.output_writer import OutputWriter
 
 
 class Agent:

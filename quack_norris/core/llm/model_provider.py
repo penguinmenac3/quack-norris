@@ -6,6 +6,7 @@ from functools import partial
 
 from quack_norris.logging import logger
 from quack_norris.core.llm.types import LLM, Embedder, ModelConnectionSpec, ChatMessage, Tool, LLMResponse
+from quack_norris.config import Config
 
 
 # Registry for provider -> connection class
@@ -43,22 +44,24 @@ class ModelProvider(object):
     _models: dict[str, str] = {}
 
     @staticmethod
-    def load_config(config: dict[str, ModelConnectionSpec] | None) -> None:
-        if config is None:
-            config = {
+    def initialize(config: Config) -> None:
+        logger.info("Initializing LLMs")
+        llms = config.get("llms", None)
+        if llms is None:
+            llms = {
                 "Ollama": ModelConnectionSpec(
                     api_endpoint="http://localhost:11434",
                     api_key="ollama",
                     provider="ollama",
                     model="AUTODETECT",
-                    config={}
+                    config={},
                 ),
             }
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [
                 executor.submit(ModelProvider._add_connection, config=conn, connection_name=name)
-                for name, conn in config.items()
+                for name, conn in llms.items()
             ]
             # Store the models temporarily so we can add them in the order of the config
             # in case the user intentionally overwrites some connections, we can map that
@@ -67,7 +70,7 @@ class ModelProvider(object):
                 name, connection, models = future.result()  # Raise exceptions if any
                 ModelProvider._connections[name] = connection
                 results[name] = models
-            for name in config:
+            for name in llms:
                 ModelProvider._models.update(**results[name])
         logger.info(f"{len(ModelProvider._models.keys())} LLMs initialized (via {len(ModelProvider._connections.keys())} connections)")
 

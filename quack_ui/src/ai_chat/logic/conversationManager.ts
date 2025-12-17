@@ -73,7 +73,7 @@ export class ConversationManager {
         return ConversationManager.currentConversation;
     }
     public static newConversation(): void {
-        let model = localStorage["quack-norris-default-model"] || "select model";
+        let model = localStorage["quack-norris-default-model"] || "local/agent.auto";
         let conversation = new Conversation(model);
         let id = ConversationManager.addConversation("unnamed", conversation);
         ConversationManager.selectConversation(id);

@@ -1,17 +1,17 @@
-from typing import Any
 import os
 import asyncio
 
+from quack_norris.config import Config
 from quack_norris.logging import logger
-from quack_norris.core import ChatMessage, Tool, OutputWriter
-from quack_norris.servers import ChatHandler
-from quack_norris.tools.mcp import initialize_mcp_tools
+from quack_norris.api.chat_handler import ChatHandler, ChatHandlerRegistry, ChatHandlerProvider
+from quack_norris.core.agents.skill_registry import load_and_watch_skills
+from quack_norris.core.agents.agent_registry import set_default_agent_llm, load_and_watch_agents, list_agents, get_agent
+from quack_norris.core.llm.types import ChatMessage, Tool
+from quack_norris.core.output_writer import OutputWriter
+from quack_norris.core.tools.mcp import initialize_mcp_tools
 
-from quack_norris.agents.skill_registry import load_and_watch_skills
-from quack_norris.agents.agent_registry import set_default_agent_llm, load_and_watch_agents, list_agents, get_agent
 
-
-class MultiAgentRunner:
+class MultiAgentRunner(ChatHandlerProvider):
     def __init__(
         self,
         default_agent: str,
@@ -23,24 +23,25 @@ class MultiAgentRunner:
         self._max_steps = max_steps
 
     @staticmethod
-    def from_config(
-        config: dict[str, Any], config_path: str
-    ) -> "MultiAgentRunner":
+    def setup_from_config(config: Config) -> None:
         # load tools from MCP servers
         tools: list[Tool] = []
         if "mcps" in config:
             tools = asyncio.run(initialize_mcp_tools(config["mcps"]))
         else:
             logger.warning(
-                f"No MCP servers configured. Add a `mcps` section to `{config_path}` to configure them."
+                "No MCP servers configured. Add a `mcps` section to your config.json to configure them."
             )
 
         # Load agents and skills
-        agents_path = os.path.join(os.path.dirname(config_path), "agents")
         set_default_agent_llm(config.get("default_model", "gemma3:12b"))
-        load_and_watch_agents(agents_path)
-        load_and_watch_skills(agents_path)
-        return MultiAgentRunner(default_agent="auto", tools=tools)
+        for path in [config.code_home_path, config.user_home_path, config.local_path]:
+            full_path = os.path.join(path, "agents")
+            if os.path.exists(full_path):
+                load_and_watch_agents(full_path)
+                load_and_watch_skills(full_path)
+        runner = MultiAgentRunner(default_agent="auto", tools=tools)
+        ChatHandlerRegistry.register_handler_provider(runner)
 
     def add_tools(self, tools: list[Tool]):
         for tool in tools:
@@ -62,21 +63,31 @@ class MultiAgentRunner:
         logger.info(f"Active agent: `{agent}`")
         return agent
 
-    def make_chat_handlers(self) -> dict[str, ChatHandler]:
-        def _make_handler(agent):
-            if agent == self._default_agent:
-                agent = ""
+    def get_handler(self, name: str) -> ChatHandler:
+        if name not in self.list_handlers():
+            raise RuntimeError(f"Model/Agent '{name}' not found in multi-agent runner provider.")
+        name = name.replace("agent.", "")
+        if name == self._default_agent:
+            name = ""
 
-            def _handle_chat(history: list[ChatMessage], output: OutputWriter):
-                return self.chat(agent_name=agent, messages=history, output=output)
+        def _handle_chat(history: list[ChatMessage], workspace: str, output: OutputWriter):
+            return self.chat(
+                messages=history, workspace=workspace, output=output, agent_name=name
+            )
 
-            return _handle_chat
+        return _handle_chat
     
-        return {f"agent.{k}": _make_handler(k) for k in list_agents().keys()}
+    def list_handlers(self) -> list[str]:
+        return [f"agent.{k}" for k in list_agents().keys()]
 
     async def chat(
-        self, messages: list[ChatMessage], output: OutputWriter, agent_name: str = ""
+        self,
+        messages: list[ChatMessage],
+        workspace: str,
+        output: OutputWriter,
+        agent_name: str = "",
     ) -> None:
+        # TODO integrate filesystem tool and handle the workspace correctly
         tools = list(self._tools)  # copy so we can locally modify
         kwargs = {}
 

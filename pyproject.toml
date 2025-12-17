@@ -19,6 +19,9 @@ dependencies = [
     "dotenv>=0.9.9",
     "loguru>=0.7.3",
     "watchdog>=6.0.0",
+    "quack-test>=0.2.0",
+    "openevals>=0.1.2",
+    "pyside6>=6.10.1",
 ]
 
 [project.optional-dependencies]

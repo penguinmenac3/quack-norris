@@ -6,7 +6,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from quack_norris.logging import logger
-from quack_norris.agents.agent import Agent, SimpleAgent
+from quack_norris.core.agents.agent import Agent, SimpleAgent
 
 
 _agents: dict[str, Agent] = {}

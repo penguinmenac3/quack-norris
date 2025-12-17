@@ -1,12 +1,13 @@
 import { ChatMessage } from "./chatMessage"
+import { Connection } from "./connection"
 import { ConversationManager } from "./conversationManager"
-import { Agent } from "./agent"
 
 
 export class ConversationListener {
     public onMessageAdded(_message: ChatMessage): void { }
     public onMessageDeletedFrom(_idx: number, _message: ChatMessage): void { }
     public onModelChanged(_model: string): void { }
+    public onWorkspaceChanged(_workspace: string): void { }
     public onSettingChanged(_setting: string, _value: any): void { }
     public onDraftChanged(_draft_text: string, _draft_images: string[]): void { }
 }
@@ -18,7 +19,8 @@ export class Conversation {
     public constructor(
         private model: string = "",
         private messages: ChatMessage[] = [],
-        private settings: { [key: string]: any } = {}, 
+        private name: string = "Unnamed Chat",
+        private workspace: string = "",
         private draft_text: string = "",
         private draft_images: string[] = []
     ) {}
@@ -29,7 +31,7 @@ export class Conversation {
         for (let message of data.messages) {
             messages.push(new ChatMessage(message.text, message.images, message.role))
         }
-        let conversation = new Conversation(data.model, messages, data.settings, data.draft_text, data.draft_images)
+        let conversation = new Conversation(data.model, messages, data.name, data.workspace, data.draft_text, data.draft_images)
         conversation.setID(id)
         return conversation
     }
@@ -37,7 +39,8 @@ export class Conversation {
         return JSON.stringify({
             model: this.model,
             messages: this.messages,
-            settings: this.settings,
+            name: this.name,
+            workspace: this.workspace,
             draft_text: this.draft_text,
             draft_images: this.draft_images
         })
@@ -48,6 +51,17 @@ export class Conversation {
     }
     public getID(): string {
         return this.id
+    }
+
+    public getName(): string {
+        return this.name
+    }
+    public setName(name: string): void {
+        this.name = name
+        for (let listener of this.listeners) {
+            listener.onSettingChanged("name", name)
+        }
+        ConversationManager.saveConversation(this)
     }
 
     public addListener(listener: ConversationListener): void {
@@ -74,6 +88,17 @@ export class Conversation {
         ConversationManager.saveConversation(this)
     }
 
+    public getWorkspace(): string {
+        return this.workspace
+    }
+    public setWorkspace(workspace: string): void {
+        this.workspace = workspace
+        for (let listener of this.listeners) {
+            listener.onWorkspaceChanged(workspace)
+        }
+        ConversationManager.saveConversation(this)
+    }
+
     public getMessages(): ChatMessage[] {
         return this.messages
     }
@@ -96,19 +121,11 @@ export class Conversation {
         }
     }
 
-    public changeSetting(name: string, value: any) {
-        this.settings[name] = value
-        for (let listener of this.listeners) {
-            listener.onSettingChanged(name, value)
-        }
-        ConversationManager.saveConversation(this)
-    }
-
     public async sendMessage(message: string, images: string[]) {
         // Add the message to the chat history and start streaming the response
         this.addMessage(new ChatMessage(message, images, "user"))
         let messagesCopy = this.getMessages().slice()
-        let stream = Agent.getInstance().chat(this.model, messagesCopy, this.settings)
+        let stream = Connection.getInstance().stream(this.model, this.workspace, messagesCopy)
 
         // Create message and fill it with the stream
         let chatMessage = new ChatMessage("", [], this.model)

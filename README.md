@@ -82,7 +82,7 @@ The rules for AI will also apply to human contributors.
 
 Run the build command, add and commit the quack_ui/dist folder and then push this folger to gh-pages.
 
-```
+```bash
 npm run build
 rm quack_ui/dist/favicon.kra
 git add -f quack_ui/dist
@@ -91,11 +91,37 @@ git push
 git subtree push --prefix quack_ui/dist origin gh-pages
 ```
 
-### Software Architecture
+## Software Architecture
 
 The software architecture is documented in this excalidraw.
 
-![software-architecture](./docs/architecture.excalidraw.svg)
+![software-architecture](./docs/architecture-v3.excalidraw.svg)
+
+### Agent
+
+- Loops until exit or max N times
+  - Tools can stop an agent looping (e.g. switch_agent, exit)
+  - Agent can handover (switch_agent) to other agent (collaboration)
+  - Agent can call (call_agent) other agent (hierarchy)
+  - Exit will hand back to parent / user
+- Toolset composed of
+  - Parent tools (tools provided by caller)
+  - Agent tools (tools of the agent itself, defined in agent definition)
+  - Skill tools (tools of the currently active skill, defined in skill definition)
+
+### Skill
+
+- Specific set of instructions to acomplish a task
+- Specifies tools needed to acomplish that task
+
+### Tools
+
+- Builtin tools: agents (list, switch, call), skills (list, activate), exit, filesystem, ...
+- External tools: MCP to integrate other tools
+
+### Misc
+
+- Tools, Skills, LLMs & Agents are managed in Registries
 
 ## ⚖️ License
 
