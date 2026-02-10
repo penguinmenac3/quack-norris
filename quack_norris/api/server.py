@@ -1,7 +1,6 @@
 from time import time
-from typing import Any, List, Optional
+from typing import List, Optional, AsyncGenerator
 from uuid import uuid4
-import asyncio
 import json
 import logging
 
@@ -15,7 +14,6 @@ import uvicorn
 
 from quack_norris.api.chat_handler import ChatHandlerRegistry
 from quack_norris.core.llm.types import ChatMessage
-from quack_norris.core.output_writer import OutputWriter
 from quack_norris.logging import logger
 from quack_norris.config import Config
 
@@ -28,7 +26,9 @@ class ChatCompletionRequest(BaseModel):
     workspace: Optional[str] = ""
 
 
-def create_openai_api(config: Config, debug=False) -> FastAPI:
+def create_openai_api(
+    handler_registry: ChatHandlerRegistry, config: Config, debug=False
+) -> FastAPI:
     app = FastAPI(title="OpenAI Server")
 
     # Set up logging
@@ -53,7 +53,9 @@ def create_openai_api(config: Config, debug=False) -> FastAPI:
         allow_credentials=True,
     )
 
-    async def _wrap_chat_generator(stream, model):
+    async def _wrap_chat_generator(
+        stream: AsyncGenerator[str, None], model
+    ) -> AsyncGenerator[str, None]:
         i = 0
         async for token in stream:
             chunk = {
@@ -82,38 +84,17 @@ def create_openai_api(config: Config, debug=False) -> FastAPI:
         if workspace not in config.get("workspaces", {}):  # Use no workspace if invalid provided
             workspace = ""
         try:
-            async def generator():
-                queue = asyncio.Queue(maxsize=1)
-
-                # Run the graph in a background task
-                async def run_graph():
-                    output = OutputWriter(queue=queue)
-                    try:
-                        await ChatHandlerRegistry.get_handler(request.model)(
-                            history=request.messages, workspace=workspace, output=output
-                        )
-                    except Exception as e:
-                        await output.default(f"Unexpected error occured:\n\n```\n{e}\n```\n")
-                    await output.clear()
-                    await queue.put(None)  # Sentinel to signal completion
-
-                asyncio.create_task(run_graph())
-
-                while True:
-                    chunk: str | None = await queue.get()
-                    if chunk == "":
-                        continue
-                    if chunk is None:
-                        break
-                    yield chunk
-
-            response = generator()
+            response = handler_registry.get_handler(request.model)(
+                history=request.messages, workspace=workspace
+            )
         except RuntimeError as e:
-            response = str(e)
+
+            async def _error_as_stream(e: Exception) -> AsyncGenerator[str, None]:
+                yield f"ERROR: The selected model/agent has an error: {str(e)}\n"
+
+            response = _error_as_stream(e)
             reason = "error"
         if request.stream:
-            if isinstance(response, str):
-                response = [response]
             return StreamingResponse(
                 _wrap_chat_generator(response, request.model),
                 media_type="text/event-stream",
@@ -151,7 +132,7 @@ def create_openai_api(config: Config, debug=False) -> FastAPI:
                     "created": time(),
                     "owned_by": "micro-graph",
                 }
-                for model in ChatHandlerRegistry.list_handlers()
+                for model in handler_registry.list_handlers()
             ],
         }
         if debug:
@@ -177,11 +158,12 @@ def create_openai_api(config: Config, debug=False) -> FastAPI:
 
 
 def serve_openai_api(
+    handler_registry: ChatHandlerRegistry,
     config: Config,
     host: str = "localhost",
     port: int = 8000,
     debug=False,
 ):
     logger.info("Starting server")
-    app = create_openai_api(config=config, debug=debug)
+    app = create_openai_api(handler_registry=handler_registry, config=config, debug=debug)
     uvicorn.run(app, host=host, port=port)

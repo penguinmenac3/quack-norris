@@ -14,7 +14,6 @@ class ChatContent(BaseModel):
 
 class ToolParameter(TypedDict, total=False):
     type: str
-    title: str
     default: Optional[Any]
 
 

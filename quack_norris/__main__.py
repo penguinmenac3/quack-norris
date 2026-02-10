@@ -1,3 +1,4 @@
+from quack_norris.api.chat_handler import ChatHandlerRegistry
 import argparse
 import os
 
@@ -5,10 +6,11 @@ from quack_norris.api.server import serve_openai_api
 from quack_norris.api.cli import cli_chat
 from quack_norris.core.llm.model_provider import ModelProvider
 from quack_norris.core.llm.proxy_chat_handler import ProxyChatHandlerProvider
-from quack_norris.core.agents.multi_agent_runner import MultiAgentRunner
 from quack_norris.config import Config
 from quack_norris.logging import logger, log_only_warn
 from quack_norris.ui.app import create_ui
+from quack_norris.core.agents.agent_provider import AgentProvider
+from quack_norris.core.agents.loader import load_and_watch_agents_and_skills
 
 
 def parse_args():
@@ -53,6 +55,12 @@ def parse_args():
         default="agent.auto",
         help="Specify the agent that should be used. Note the prefix 'agent.*' is required. You can also use llms with 'proxy.*'.",
     )
+    parser.add_argument(
+        "--workspace",
+        type=str,
+        default="",
+        help="The workspace name for the agent to use, defaults to '' (no workspace).",
+    )
     return parser.parse_args()
 
 
@@ -66,19 +74,21 @@ def main():
         os.chdir(args.workdir)
 
     config = Config(args.config, overwrites={"debug": args.debug})
-    logger.warning(f"Using config {config}")
-    if args.serve:
-        ModelProvider.initialize(config)
-        ProxyChatHandlerProvider.setup_from_config(config)
-        MultiAgentRunner.setup_from_config(config)
-        serve_openai_api(config=config, port=11435)
-    elif args.input != "":
-        ModelProvider.initialize(config)
-        ProxyChatHandlerProvider.setup_from_config(config)
-        MultiAgentRunner.setup_from_config(config)
-        cli_chat(args.agent, args.input, args.output)
-    else:
+    if args.debug:
+        logger.debug(f"Using config {config}")
+    if not args.serve and args.input == "":
         create_ui(config)
+        return
+
+    ModelProvider.initialize(config)
+    load_and_watch_agents_and_skills(config)
+    handler_registry = ChatHandlerRegistry()
+    handler_registry.register_handler_provider(ProxyChatHandlerProvider(config))
+    handler_registry.register_handler_provider(AgentProvider())
+    if args.serve:
+        serve_openai_api(handler_registry, config=config, port=11435)
+    elif args.input != "":
+        cli_chat(handler_registry, args.agent, args.input, args.workspace, args.output)
 
 
 if __name__ == "__main__":

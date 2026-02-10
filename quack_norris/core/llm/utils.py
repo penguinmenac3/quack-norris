@@ -34,9 +34,15 @@ def tools_to_openai(tools: list[Tool] = []) -> list[dict[str, Any]]:
                 "parameters": {
                     "type": "object",
                     "properties": tool.parameters,
-                    "required": list(tool.parameters.keys()),
+                    "required": list(
+                        [
+                            k
+                            for k, v in tool.parameters.items()
+                            if "default" not in v or v["default"] is None
+                        ]
+                    ),
                 },
-            }
+            },
         }
         for tool in tools
     ]
@@ -56,8 +62,10 @@ def tools_to_custom_prompt(tools: list[Tool], tool_calling_prompt: str) -> str:
             description = description[:-1]
         parameters = ""
         for param_name, param_details in tool.parameters.items():
-            default = f"(default: {param_details['default']})" if "default" in param_details else ""
-            parameters += f"  - {param_name}: {param_details.get('title', '')} {default}\n"
+            default = (
+                f" (default: {param_details['default']})" if "default" in param_details else ""
+            )
+            parameters += f"  - {param_name}: {param_details.get('type', '')}{default}\n"
         tool_descriptions.append(
             f"* {tool.name.lower()}: {description}.\n{parameters}\n".strip()
         )
