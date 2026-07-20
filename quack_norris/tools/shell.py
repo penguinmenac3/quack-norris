@@ -124,7 +124,7 @@ def make_shell_tool(
             command: Annotated[str, Param("The PowerShell command to execute. Do NOT prefix with 'cd ...' — use the cwd parameter instead, or omit it entirely to run in the project root.")],
             cwd: Annotated[str, Param(_cwd_note)] = "",
         ) -> ToolResult:
-            """Execute a PowerShell (pwsh) command and return its output (stdout + stderr combined)."""
+            """Execute a PowerShell (pwsh) command and return its output (stdout + stderr combined). This is a Windows machine use powershell commands, unix commands will not work."""
             return await _run_shell(command, cwd, get_cwd(), registry)
 
         from quack_norris.tools.files import attach_path_normalizer
@@ -137,7 +137,7 @@ def make_shell_tool(
             command: Annotated[str, Param("The bash command to execute. Do NOT prefix with 'cd ...' — use the cwd parameter instead, or omit it entirely to run in the project root.")],
             cwd: Annotated[str, Param(_cwd_note)] = "",
         ) -> ToolResult:
-            """Execute a bash command and return its output (stdout + stderr combined)."""
+            """Execute a bash command and return its output (stdout + stderr combined). This is a Unix/Linux/Mac machine so only use bash commands."""
             return await _run_shell(command, cwd, get_cwd(), registry)
 
         from quack_norris.tools.files import attach_path_normalizer
