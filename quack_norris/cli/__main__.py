@@ -551,6 +551,119 @@ async def _read_input() -> str:
     return ui.text
 
 
+def _compute_usage(ctx: SlashContext) -> None:
+    """Print session usage statistics derived from the event log and in-memory history."""
+    from datetime import datetime, timezone
+
+    events = read_events(ctx.session_id) if session_exists(ctx.session_id) else []
+
+    # --- Counts from event log ---
+    user_msgs = 0
+    tool_calls_total = 0
+    tool_calls_denied = 0
+    tool_counts: dict[str, int] = {}
+    compactions_auto = 0
+    compactions_manual = 0
+    total_chars_in = 0   # user + tool result content sent to LLM
+    total_chars_out = 0  # assistant text generated
+    today_chars_in = 0
+    today_chars_out = 0
+    first_ts: str | None = None
+
+    today_date = datetime.now(timezone.utc).date()
+
+    def _is_today(ts: str | None) -> bool:
+        if not ts:
+            return False
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).date() == today_date
+        except ValueError:
+            return False
+
+
+    for ev in events:
+        t = ev.get("type", "")
+        data = ev.get("data", {})
+        ts = ev.get("ts")
+        if first_ts is None:
+            first_ts = ts
+        if t == "user_message":
+            user_msgs += 1
+            chars = len(data.get("text", ""))
+            total_chars_in += chars
+            if _is_today(ts):
+                today_chars_in += chars
+        elif t == "content_end":
+            chars = len(data.get("text", ""))
+            total_chars_out += chars
+            if _is_today(ts):
+                today_chars_out += chars
+        elif t == "tool_call_start":
+            tool_name = data.get("tool", "unknown")
+            tool_calls_total += 1
+            tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
+        elif t == "tool_call_denied":
+            tool_calls_denied += 1
+        elif t == "tool_call_result":
+            chars = len(data.get("result", ""))  # result fed back to LLM
+            total_chars_in += chars
+            if _is_today(ts):
+                today_chars_in += chars
+        elif t == "history_compacted":
+            trigger = data.get("trigger", "manual")
+            if trigger == "auto":
+                compactions_auto += 1
+            else:
+                compactions_manual += 1
+
+    total_chars = total_chars_in + total_chars_out
+    est_total = total_chars // 4
+    est_in = total_chars_in // 4
+    est_out = total_chars_out // 4
+    est_today = (today_chars_in + today_chars_out) // 4
+
+    # --- Active history token estimate ---
+    active_chars = sum(
+        len(m.content) for m in ctx.chat_history if hasattr(m, "content")
+    )
+    est_active = active_chars // 4
+    context_window = LLM.get_context_window(ctx.model)
+    active_pct = est_active * 100 // context_window if context_window else 0
+
+    # --- Session age ---
+    age_str = ""
+    if first_ts:
+        try:
+            start = datetime.fromisoformat(first_ts.replace("Z", "+00:00"))
+            delta = datetime.now(timezone.utc) - start
+            h, rem = divmod(int(delta.total_seconds()), 3600)
+            m, s = divmod(rem, 60)
+            age_str = f"  session age      {h}h {m}m {s}s"
+        except ValueError:
+            pass
+
+    compaction_str = f"{compactions_auto} auto, {compactions_manual} manual"
+
+    lines = [
+        "  ── Usage ──────────────────────────────────────",
+        f"  user messages    {user_msgs}",
+        f"  tool calls       {tool_calls_total}  ({tool_calls_denied} denied)",
+    ]
+    if tool_counts:
+        for name, count in sorted(tool_counts.items(), key=lambda x: -x[1]):
+            lines.append(f"    {name:<18} {count}")
+    lines += [
+        f"  compactions      {compaction_str}",
+        f"  est. tokens used {est_total:,}  (in: {est_in:,}, out: {est_out:,})",
+        f"  est. tokens today {est_today:,}  (in: {today_chars_in // 4:,}, out: {today_chars_out // 4:,})",
+        f"  active history   ~{est_active:,} tokens  ({active_pct}% of {context_window:,} context window)",
+    ]
+    if age_str:
+        lines.append(age_str)
+    lines.append("  ────────────────────────────────────────────────")
+    print("\n".join(lines))
+
+
 async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool, str]:
     """Process a slash command.
 
@@ -581,6 +694,7 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
             "  /model <name>      Switch model immediately\n"
             "  /project <dir>     Change project working directory\n"
             "  /compact           Compact history\n"
+            "  /usage             Show session token and request stats\n"
             "  /archive           Exit and archive this session\n"
             "  /help              Show this help\n"
             "  /exit  /quit       Exit"
@@ -638,6 +752,10 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
             ctx.whitelist.load(path)
         print(f"  Project: {old} → {path}")
         return True, f"[The user switched the project directory to '{path}'. Relative paths now resolve against this directory.]"
+
+    if cmd == "/usage":
+        _compute_usage(ctx)
+        return False
 
     if cmd == "/compact":
         print("  Compacting history...")
