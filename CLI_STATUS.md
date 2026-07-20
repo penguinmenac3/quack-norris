@@ -14,7 +14,7 @@
 - **Approval whitelist** — `.quack-whitelist.yaml` (project, always resolved from session CWD) + `~/.quack-norris/whitelist.yaml` (global); pattern picker with session/project/global scope; glob matching (`*` / `**`); whitelist reloads on `/project` switch
 - **Dynamic approval predicates** — `@tool(needs_approval=fn)` allows per-call approval decisions based on arguments (e.g. `file_view` auto-executes inside CWD, escalates outside)
 - **Session menu** — list/select from existing sessions on startup
-- **`--resume <id>`** — skip menu, jump to specific session
+- **`--resume <id>`** — skip menu, jump to specific session; supports prefix matching: unique prefix resumes directly, ambiguous/no match falls through to the session picker
 - **`--project <dir>`** — start directly in a specified project directory
 - **`--archive-on-exit`** — archive session on clean exit
 - **History reconstruction** — rebuild ChatMessage history from session.jsonl on resume, respects history_compacted cutoff; history display on resume uses the same `Renderer` as live output — tool calls replayed as `ToolCallOutput` (⚡ badge + indented args), tool results replayed as `ToolResultOutput` (❌ on error, indented content on success), assistant text replayed as `TextOutput`, so the resumed session view is visually identical to live rendering; `show_output` persisted in `tool_call_result` events so history replay respects it — `file_view` and other silent tools don't dump their output on resume, only `pwsh`/`bash`/background tools (which have `show_output=True`) do; old events without the field default to `False`

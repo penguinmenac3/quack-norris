@@ -964,12 +964,21 @@ def main() -> None:
         # `quack-norris --resume` (no id) — show session picker
         session_id, meta = _session_menu(initial_meta)
     else:
-        # `quack-norris --resume <id>` — resume directly
-        session_id = resume_arg
-        meta = read_meta(session_id)
-        if meta is None:
-            print(f"Error: session not found: {session_id}", file=sys.stderr)
-            sys.exit(1)
+        # `quack-norris --resume <id>` — exact match, then prefix match
+        meta = read_meta(resume_arg)
+        if meta is not None:
+            session_id = resume_arg
+        else:
+            matches = [s for s in list_sessions(include_archived=True) if s.id.startswith(resume_arg)]
+            if len(matches) == 1:
+                session_id = matches[0].id
+                meta = matches[0]
+            else:
+                if len(matches) == 0:
+                    print(f"No session matching '{resume_arg}', select from list:")
+                else:
+                    print(f"Ambiguous prefix '{resume_arg}' matches {len(matches)} sessions, select from list:")
+                session_id, meta = _session_menu(initial_meta)
 
     meta.owner = "terminal"
     meta.pid = os.getpid()
