@@ -1,1 +1,0 @@
-uvw run quack-norris
