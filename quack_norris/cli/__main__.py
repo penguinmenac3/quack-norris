@@ -417,9 +417,6 @@ async def _run_turn(
 
     touch_meta(meta, status="idle")
 
-    # Update in-memory history
-    chat_history.append(AssistantMessage(content=final_text, tool_calls=[]))
-
     return final_text
 
 

@@ -127,7 +127,7 @@ async def agent(
     str
         The final assistant message (complete text, not streamed).
     """
-    history = list(chat_history)
+    history = chat_history
     _get_prompt = system_prompt if callable(system_prompt) else lambda: system_prompt
 
     for _iteration in range(_MAX_ITERATIONS):
