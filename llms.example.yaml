@@ -1,0 +1,45 @@
+# This file can live in the project directory (project-local overrides) and/or
+# in ~/.quack-norris/config.yaml (global defaults). The local file is merged on
+# top of the global one, so it doesn't need to repeat everything — e.g. a
+# project-local file could set just `defaults.model` or one `llms:` group.
+
+defaults:
+  model: ollama/qwen3:14b   # default model, "group/model-name"; overridable via --model
+
+# History compaction settings (all optional; defaults shown below)
+compaction:
+  enabled: true    # auto-compaction on/off; manual /compact is unaffected
+  threshold: 0.80  # fraction of the model's context window that triggers auto-compaction
+  target: 0.30     # fraction of the context window kept as an un-summarised tail after compacting
+  min_turns: 8     # minimum chat history length before auto-compaction can trigger
+
+llms:
+  - group: ollama
+    provider: OpenAI
+    api_endpoint: http://localhost:11434/v1
+    api_key: ollama
+
+  - group: openai
+    provider: OpenAI
+    api_endpoint: https://api.openai.com/v1
+    api_key: ${OPENAI_API_KEY}
+    models:
+      - gpt-4o
+      - gpt-4o-mini
+      - o3
+
+  - group: nexus
+    provider: AWSBedrock
+    api_endpoint: https://bedrock.my-corp.example.com
+    api_key: ${AWS_BEARER_TOKEN_BEDROCK}
+    region: us-east-1
+    models:
+      - anthropic.claude-3-5-sonnet-20241022-v2:0
+
+  - group: azure
+    provider: AzureOpenAI
+    api_endpoint: https://my-resource.openai.azure.com
+    api_key: ${AZURE_OPENAI_KEY}
+    api_version: "2024-02-01"
+    models:
+      - gpt-4o

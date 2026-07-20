@@ -1,0 +1,254 @@
+"""
+Core agent loop.
+
+This module is intentionally free of:
+- event buses
+- HTTP / SSE
+- storage
+- any framework
+
+It only needs the LLM layer and a list of Tool instances.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any, Union
+
+from quack_norris.core.llm import (
+    LLM,
+    ApprovalState,
+    AssistantMessage,
+    ChatMessage,
+    TextDelta,
+    ThinkingDelta,
+    ToolResultMessage,
+    Tool,
+    ToolCallRequest,
+    ToolResult,
+    UserMessage,
+)
+
+__all__ = [
+    "agent",
+    "AgentOutput",
+    "TextOutput",
+    "ThinkingOutput",
+    "ToolCallOutput",
+    "ToolResultOutput",
+]
+
+# ---------------------------------------------------------------------------
+# Agent output types
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TextOutput:
+    """A streamed chunk of assistant text."""
+
+    text: str
+
+
+@dataclass
+class ThinkingOutput:
+    """A streamed chunk of model reasoning."""
+
+    text: str
+
+
+@dataclass
+class ToolCallOutput:
+    """The agent is about to call a tool (before execution)."""
+
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    needs_approval: ApprovalState
+
+
+@dataclass
+class ToolResultOutput:
+    """Result after a tool has been executed (or denied)."""
+
+    tool_call_id: str
+    tool_name: str
+    result: ToolResult
+    show_output: bool = False  # Mirror of Tool.show_output — renderer prints content if True
+
+
+AgentOutput = TextOutput | ThinkingOutput | ToolCallOutput | ToolResultOutput
+
+# ---------------------------------------------------------------------------
+# Agent loop
+# ---------------------------------------------------------------------------
+
+_MAX_ITERATIONS = 64
+_INTERRUPTED = "---interrupted---"
+_EMPTY_RESPONSE_NUDGE = "Your last response was empty. Please try again."
+
+
+async def agent(
+    *,
+    model: str,
+    system_prompt: Union[str, Callable[[], str]],
+    tools: list[Tool],
+    chat_history: list[ChatMessage],
+    on_permission_request: Callable[[ToolCallOutput], Awaitable[bool]],
+    on_output: Callable[[AgentOutput], Awaitable[None]],
+) -> str:
+    """
+    Run the agent loop until the LLM produces a final text response.
+
+    Parameters
+    ----------
+    model:
+        Model string, e.g. ``"ollama/qwen3:14b"``.
+    system_prompt:
+        The agent's persona / instructions.
+    tools:
+        Tool instances the agent may call.  Passed directly to
+        :meth:`LLM.converse`; tool definitions are derived automatically and
+        each yielded :class:`~quack_norris.core.llm.tool.ToolCallRequest`
+        arrives with ``execute`` and ``needs_approval`` already bound.
+    chat_history:
+        Prior turns (mutable — the loop appends to this list).
+    on_permission_request:
+        Called when a tool needs human approval (``needs_approval=True`` or
+        ``"human"``).  Receives the :class:`ToolCallOutput` for display;
+        return ``True`` to allow, ``False`` to deny.  When ``needs_approval``
+        is ``"human"`` the whitelist is skipped and this is called directly.
+    on_output:
+        Called for every :class:`AgentOutput` item as it arrives.
+
+    Returns
+    -------
+    str
+        The final assistant message (complete text, not streamed).
+    """
+    history = list(chat_history)
+    _get_prompt = system_prompt if callable(system_prompt) else lambda: system_prompt
+
+    for _iteration in range(_MAX_ITERATIONS):
+        # ------------------------------------------------------------------ #
+        # Call the LLM                                                         #
+        # ------------------------------------------------------------------ #
+        stream = await LLM.converse(
+            model=model,
+            system_prompt=_get_prompt(),
+            tools=tools,
+            chat_history=history,
+        )
+
+        text_chunks: list[str] = []
+        tool_calls: list[ToolCallRequest] = []
+
+        try:
+            async for item in stream:
+                if isinstance(item, ThinkingDelta):
+                    await on_output(ThinkingOutput(text=item.text))
+                elif isinstance(item, TextDelta):
+                    text_chunks.append(item.text)
+                    await on_output(TextOutput(text=item.text))
+                elif isinstance(item, ToolCallRequest):
+                    tool_calls.append(item)
+        except asyncio.CancelledError:
+            suffix = f"\n\n{_INTERRUPTED}"
+            await on_output(TextOutput(text=suffix))
+            full_text = "".join(text_chunks) + suffix
+            history.append(AssistantMessage(content=full_text, tool_calls=[]))
+            return full_text
+
+        full_text = "".join(text_chunks)
+
+        history.append(AssistantMessage(content=full_text, tool_calls=tool_calls))
+
+        # ------------------------------------------------------------------ #
+        # Empty response (no text, no tool calls) → nudge and retry           #
+        # ------------------------------------------------------------------ #
+        if not full_text and not tool_calls:
+            history.append(UserMessage(content=_EMPTY_RESPONSE_NUDGE))
+            continue
+
+        # ------------------------------------------------------------------ #
+        # No tool calls → we're done                                           #
+        # ------------------------------------------------------------------ #
+        if not tool_calls:
+            return full_text
+
+        # ------------------------------------------------------------------ #
+        # Execute tool calls                                                   #
+        # ------------------------------------------------------------------ #
+        tool_results: list[ToolResultMessage] = []
+
+        for i, tc in enumerate(tool_calls):
+            call_output = ToolCallOutput(
+                tool_call_id=tc.id,
+                tool_name=tc.name,
+                arguments=tc.arguments,
+                needs_approval=tc.needs_approval,
+            )
+            await on_output(call_output)
+
+            try:
+                if tc.execute is None:
+                    result = ToolResult(
+                        content=f"Unknown tool '{tc.name}'.", is_error=True
+                    )
+                else:
+                    # Validate args before approval — missing required args go straight back to LLM.
+                    matched_tool = next((t for t in tools if t.name == tc.name), None)
+                    validation_error = matched_tool.validate_arguments(tc.arguments) if matched_tool else None
+                    if validation_error is not None:
+                        result = validation_error
+                    elif tc.needs_approval is False:
+                        result = await tc.execute(**tc.arguments)
+                    else:
+                        # True  → on_permission_request checks whitelist first, then human
+                        # "human" → on_permission_request skips whitelist, goes to human
+                        approval = await on_permission_request(call_output)
+                        if isinstance(approval, ToolResult):
+                            # Denied with a reason — use the ToolResult directly
+                            result = approval
+                        elif not approval:
+                            result = ToolResult(
+                                content="Tool call was denied by the user.", is_error=True
+                            )
+                        else:
+                            result = await tc.execute(**tc.arguments)
+            except asyncio.CancelledError:
+                for cancelled_tc in tool_calls[i:]:
+                    cancelled_result = ToolResult(content=_INTERRUPTED, is_error=True)
+                    await on_output(ToolResultOutput(
+                        tool_call_id=cancelled_tc.id,
+                        tool_name=cancelled_tc.name,
+                        result=cancelled_result,
+                    ))
+                    tool_results.append(ToolResultMessage(
+                        tool_call_id=cancelled_tc.id,
+                        content=_INTERRUPTED,
+                        is_error=True,
+                    ))
+                history.extend(tool_results)
+                full_text = full_text + f"\n\n{_INTERRUPTED}"
+                return full_text
+
+            await on_output(ToolResultOutput(
+                tool_call_id=tc.id,
+                tool_name=tc.name,
+                result=result,
+                show_output=tc.show_output,
+            ))
+            tool_results.append(ToolResultMessage(
+                tool_call_id=tc.id,
+                content=result.content,
+                is_error=result.is_error,
+            ))
+
+        history.extend(tool_results)
+
+    raise RuntimeError(
+        f"Agent loop exceeded maximum iterations ({_MAX_ITERATIONS}). "
+        "This likely indicates an infinite tool-call cycle."
+    )
