@@ -109,6 +109,7 @@ class SlashContext:
     system_prompt: str
     whitelist: "Whitelist | None" = field(default=None)
     archive_on_exit: bool = field(default=False)
+    system_prompt_parts: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +452,7 @@ async def _run_interactive(
         model=model,
         system_prompt=system_prompt,
         whitelist=whitelist,
+        system_prompt_parts=system_prompt_parts,
     )
 
     print(f"\nQuackNorris  |  session: {session_id[:8]}...  |  agent: {meta.agent}  |  model: {model}")
@@ -480,7 +482,11 @@ async def _run_interactive(
             if changed == "exit":
                 print("Bye.")
                 break
-            if isinstance(changed, tuple):
+            if isinstance(changed, tuple) and changed[0] == "skill":
+                _, hint = changed
+                # Inject as UserMessage and run an agent turn immediately
+                text = hint
+            elif isinstance(changed, tuple):
                 _, hint = changed
                 chat_history.append(UserMessage(content=hint))
                 model = meta.model or model
@@ -490,10 +496,13 @@ async def _run_interactive(
                     Path(meta.cwd) if meta.cwd else None,
                 )
                 ctx.system_prompt = system_prompt
+                continue
             elif changed:
                 model = meta.model or model
                 ctx.model = model
-            continue
+                continue
+            else:
+                continue
 
         # --- Agent turn ---
         touch_meta(meta, status="working")
@@ -661,7 +670,7 @@ def _compute_usage(ctx: SlashContext) -> None:
     print("\n".join(lines))
 
 
-async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool, str]:
+async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool, str] | tuple[str, str]:
     """Process a slash command.
 
     Returns:
@@ -669,6 +678,7 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
       False            — no-op (listing, unknown command)
       True             — meta changed, no chat hint needed
       (True, str)      — meta changed, inject str as a UserMessage into chat history
+      ('skill', str)   — inject str as a UserMessage and run an agent turn
     """
     parts = text.split(None, 1)
     cmd = parts[0].lower()
@@ -690,6 +700,8 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
             "  /agent <name>      Switch agent immediately\n"
             "  /model <name>      Switch model immediately\n"
             "  /project <dir>     Change project working directory\n"
+            "  /skills            List available skills\n"
+            "  /<skill_name>      Load a skill into context\n"
             "  /compact           Compact history\n"
             "  /usage             Show session token and request stats\n"
             "  /archive           Exit and archive this session\n"
@@ -750,6 +762,10 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
         print(f"  Project: {old} → {path}")
         return True, f"[The user switched the project directory to '{path}'. Relative paths now resolve against this directory.]"
 
+    if cmd == "/skills":
+        _list_skills(ctx.meta.cwd)
+        return False
+
     if cmd == "/usage":
         _compute_usage(ctx)
         return False
@@ -767,6 +783,25 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
         else:
             ctx.chat_history[:] = new_history
             print("  done.")
+        return False
+
+    # Try to match as a skill name (/<skill_name>)
+    skill_name = cmd[1:]  # strip leading /
+    if skill_name:
+        from quack_norris.cli.agents import discover_skills, load_skill_content
+        available = discover_skills(Path(meta.cwd) if meta.cwd else None)
+        if skill_name in available:
+            content = load_skill_content(skill_name, Path(meta.cwd) if meta.cwd else None)
+            if content is not None:
+                hint = f"{text}\n\n[autoloaded skill]\n# Skill: {skill_name}\n\n{content}"
+                print(f"  Skill '{skill_name}' loaded.")
+                return "skill", hint
+        close = [s for s in available if skill_name.lower() in s.lower() or s.lower() in skill_name.lower()]
+        print(f"  Unknown command or skill: {cmd}.")
+        if close:
+            print(f"  Did you mean skill: {', '.join(close)}?")
+        else:
+            print("  Type /help for commands or /skills to list skills.")
         return False
 
     print(f"  Unknown command: {cmd}. Type /help for commands.")
@@ -1078,6 +1113,17 @@ def _list_agents(current: str, cwd: str | None = None) -> None:
             print(f"    {a}{marker}")
     else:
         print("  No agent definitions found. Install agents with quack-norris-manage.")
+
+
+def _list_skills(cwd: str | None = None) -> None:
+    from quack_norris.cli.agents import discover_skills
+    skills = discover_skills(Path(cwd) if cwd else None)
+    if skills:
+        print("  Available skills:")
+        for s in skills:
+            print(f"    /{s}")
+    else:
+        print("  No skills found. Install skills with quack-norris-manage.")
 
 
 _PROJECT_MARKERS = {".git", ".github", ".agents", ".venv", "node_modules", "pyproject.toml", "package.json"}
