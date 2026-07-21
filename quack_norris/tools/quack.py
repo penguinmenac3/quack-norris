@@ -82,20 +82,6 @@ def make_quack_tools(ctx: QuackContext) -> list:
         return ToolResult(content="Available agents:\n" + "\n".join(lines))
 
     # ------------------------------------------------------------------
-    # list_skills
-    # ------------------------------------------------------------------
-
-    @tool
-    def list_skills() -> ToolResult:
-        """List available skills that can be loaded with use_skill. You may call this on your own initiative when a skill might be relevant for the current task."""
-        from quack_norris.cli.agents import discover_skills
-        skills = discover_skills(Path(ctx.meta.cwd) if ctx.meta.cwd else None)
-        if not skills:
-            return ToolResult(content="No skills found.")
-        lines = [f"  {s}" for s in sorted(skills)]
-        return ToolResult(content="Available skills:\n" + "\n".join(lines))
-
-    # ------------------------------------------------------------------
     # list_projects
     # ------------------------------------------------------------------
 
@@ -238,7 +224,6 @@ def make_quack_tools(ctx: QuackContext) -> list:
     tools = [
         ask_user,
         list_agents,
-        list_skills,
         list_projects,
         switch_agent,
         spawn_subagent,

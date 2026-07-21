@@ -905,10 +905,25 @@ _DEFAULT_AGENT_NAME = "Quack Norris"
 
 def _load_system_prompt(agent_name: str | None, project_root: Path | None = None) -> str:
     """Load system prompt from agent definition, or return the default."""
-    from quack_norris.cli.agents import load_agent_system_prompt
+    from quack_norris.cli.agents import load_agent_system_prompt, discover_skills
     if agent_name and agent_name != _DEFAULT_AGENT_NAME:
-        return load_agent_system_prompt(agent_name, project_root)
-    return _DEFAULT_SYSTEM_PROMPT
+        base = load_agent_system_prompt(agent_name, project_root)
+    else:
+        base = _DEFAULT_SYSTEM_PROMPT
+    skills = discover_skills(project_root)
+    if skills:
+        from quack_norris.cli.agents import load_skill_description
+        skill_lines = "\n".join(
+            f"* `{s}` : {load_skill_description(s, project_root)}" for s in skills
+        )
+        base = (
+            base
+            + "\n\n## Available Skills\n\n"
+            + "The user can invoke skills, but you can also invoke skills, if you see fit for a certain situation where a skill would be beneficial and match the situation. "
+            + "Skills are like a recipe, they explain how to do some task. If you want to do a task covered by a skill, first load that skill.\n\n"
+            + skill_lines
+        )
+    return base
 
 
 # LLM setup

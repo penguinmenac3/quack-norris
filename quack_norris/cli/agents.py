@@ -162,6 +162,51 @@ def load_skill_content(name: str, project_root: Path | None = None) -> str | Non
     return None
 
 
+def load_skill_description(name: str, project_root: Path | None = None, max_chars: int = 1000) -> str:
+    """Return a short description for a skill from its SKILL.md.
+
+    Tries the YAML frontmatter ``description:`` field first, then falls back
+    to the first non-empty, non-heading line after stripping frontmatter.
+    Truncates to *max_chars* with an ellipsis if longer.
+    """
+    content = load_skill_content(name, project_root)
+    if not content:
+        return ""
+    desc = ""
+    # Try frontmatter description: field
+    if content.startswith("---"):
+        end = content.find("---", 3)
+        if end != -1:
+            frontmatter = content[3:end]
+            lines = frontmatter.splitlines()
+            for i, line in enumerate(lines):
+                if line.lower().startswith("description:"):
+                    value = line.split(":", 1)[1].strip()
+                    if value in (">", "|", ">-", "|-", ">+", "|+"):
+                        # Block scalar — collect indented continuation lines
+                        block_lines = []
+                        for cont in lines[i + 1:]:
+                            if cont and (cont[0] == " " or cont[0] == "\t"):
+                                block_lines.append(cont.strip())
+                            else:
+                                break
+                        desc = " ".join(block_lines)
+                    else:
+                        desc = value.strip('"').strip("'")
+                    break
+    # Fall back to first non-empty, non-heading line of the body
+    if not desc:
+        body = _strip_frontmatter(content)
+        for line in body.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                desc = stripped
+                break
+    if len(desc) > max_chars:
+        desc = desc[:max_chars] + "..."
+    return desc
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
