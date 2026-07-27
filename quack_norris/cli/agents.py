@@ -152,14 +152,22 @@ def discover_skills(project_root: Path | None = None) -> list[str]:
     return sorted(names)
 
 
-def load_skill_content(name: str, project_root: Path | None = None) -> str | None:
-    """Load skill content by name. Returns None if not found."""
+def find_skill_path(name: str, project_root: Path | None = None) -> Path | None:
+    """Return the skill folder path by name, or None if the skill is not found."""
     for d in [_project_skills_dir(project_root), _global_skills_dir()]:
         if d and d.is_dir():
             skill_file = d / name / "SKILL.md"
             if skill_file.exists():
-                return skill_file.read_text(encoding="utf-8", errors="replace")
+                return skill_file.parent
     return None
+
+
+def load_skill_content(name: str, project_root: Path | None = None) -> str | None:
+    """Load skill content by name. Returns None if not found."""
+    skill_path = find_skill_path(name, project_root)
+    if skill_path is None:
+        return None
+    return (skill_path / "SKILL.md").read_text(encoding="utf-8", errors="replace")
 
 
 def load_skill_description(name: str, project_root: Path | None = None, max_chars: int = 1000) -> str:

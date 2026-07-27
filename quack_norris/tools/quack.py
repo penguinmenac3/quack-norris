@@ -14,7 +14,7 @@ Auto-approved:
 Requires approval:
   switch_agent      — hand the session to a different agent
   spawn_subagent    — run a sub-task with a different agent, return result
-  use_skill         — load a skill into the session system prompt
+  use_skill         — load a skill and return its content
   switch_project    — change the session working directory
 """
 
@@ -187,13 +187,19 @@ def make_quack_tools(ctx: QuackContext) -> list:
     def use_skill(
         name: Annotated[str, Param("Skill name to load (use list_skills to see options)")],
     ) -> ToolResult:
-        """Load a skill and append its content to the session system prompt."""
-        from quack_norris.cli.agents import load_skill_content
-        content = load_skill_content(name, Path(ctx.meta.cwd) if ctx.meta.cwd else None)
-        if content is None:
-            return ToolResult(content=f"Skill '{name}' not found. Use list_skills to see available skills.", is_error=True)
-        ctx.system_prompt_parts.append(f"\n\n---\n# Skill: {name}\n\n{content}")
-        return ToolResult(content=f"Skill '{name}' loaded into context.")
+        """Load a skill and return its instructions in the tool result."""
+        from quack_norris.cli.agents import find_skill_path, load_skill_content
+        project_root = Path(ctx.meta.cwd) if ctx.meta.cwd else None
+        skill_path = find_skill_path(name, project_root)
+        content = load_skill_content(name, project_root)
+        if skill_path is None or content is None:
+            return ToolResult(
+                content=f"Skill '{name}' not found. Use list_skills to see available skills.",
+                is_error=True,
+            )
+        return ToolResult(
+            content=f"# Skill: {name}\n\nSkill-Path: {skill_path}\n\n{content}"
+        )
 
     # ------------------------------------------------------------------
     # switch_project (approval required)
