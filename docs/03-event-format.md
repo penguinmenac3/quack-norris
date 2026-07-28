@@ -29,30 +29,35 @@ The socket replays the full `session.jsonl` on each new connection, then continu
 
 Session config (name, agent, model, cwd) is stored exclusively in `meta.json`. It is never written to `session.jsonl`. The log is purely conversation content.
 
-### `history_compacted`
+### `checkpoint`
 
-Appended when history compaction runs (auto or manual). Events with `id ≤ cutoff_id` are excluded from the LLM context going forward. The raw events remain in the file permanently.
+Appended when the oldest part of the conversation is summarised away (auto or manual). The raw events remain in the file permanently; only the LLM context is affected.
 
 ```json
 {
   "id": 291,
-  "type": "history_compacted",
+  "type": "checkpoint",
   "ts": "2026-07-09T17:00:00Z",
   "data": {
-    "cutoff_id": 289,
     "summary": "The user asked for a test run and a refactor of the auth module. Both completed successfully.",
-    "trigger": "auto"
+    "replaces": 42,
+    "trigger": "auto",
+    "tokens_before": 98304,
+    "tokens_after": 41200
   }
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `cutoff_id` | Events with `id ≤ cutoff_id` are replaced by `summary` in the LLM context |
-| `summary` | LLM-generated summary of all history up to `cutoff_id` |
-| `trigger` | `"auto"` (threshold exceeded) or `"manual"` (`/compact` or Web UI button) |
+| `summary` | LLM-generated summary of the messages it replaces |
+| `replaces` | Number of leading **replayed messages** the summary stands in for |
+| `trigger` | `"auto"` (threshold crossed) or `"manual"` (`/compact` or Web UI button) |
+| `tokens_before` / `tokens_after` | Estimated context size either side of the checkpoint |
 
-If multiple `history_compacted` events exist, only the one with the **highest `cutoff_id`** is used.
+`replaces` counts messages in the replayed history, **not** event ids — reconstruction is `[CheckpointMessage] + replayed[replaces:]`. This is why every assistant message and every injected nudge is logged: a replay has to reproduce the agent's in-memory list one for one or the offset points at the wrong place.
+
+If multiple `checkpoint` events exist, only the one with the **highest `replaces`** is used; each checkpoint folds the previous summary into its own, so the newest subsumes all earlier ones.
 
 ---
 
@@ -96,7 +101,7 @@ Examples of generated hint text:
 - `[System: Model switched to ollama/gemma3]`
 - `[System: Project directory changed to /home/alice/other-app]`
 
-Hints appear in the Web UI history as a subtle inline notice (not styled as a user or agent message). They are included in `history_compacted` summaries so context survives compaction.
+Hints appear in the Web UI history as a subtle inline notice (not styled as a user or agent message). They are replayed as user messages and folded into `checkpoint` summaries, so the context survives.
 
 ---
 
@@ -303,7 +308,7 @@ Send a user message (with optional config delta).
 
 ### `cmd_compact`
 
-Trigger a manual history compaction. Produced by the `/compact` slash command or the Web UI compact button.
+Trigger a manual checkpoint. Produced by the `/compact` slash command or the Web UI compact button.
 
 ```json
 {
@@ -312,7 +317,7 @@ Trigger a manual history compaction. Produced by the `/compact` slash command or
 }
 ```
 
-The CLI runs compaction immediately regardless of token count and appends a `history_compacted` event with `"trigger": "manual"`.
+The CLI checkpoints immediately regardless of token count and appends a `checkpoint` event with `"trigger": "manual"`.
 
 ---
 

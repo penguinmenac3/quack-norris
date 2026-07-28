@@ -11,6 +11,7 @@ import sys
 
 from quack_norris.core.agent import (
     AgentOutput,
+    CheckpointOutput,
     TextOutput,
     ThinkingOutput,
     ToolCallOutput,
@@ -51,6 +52,8 @@ class Renderer:
             self._handle_tool_call(item)
         elif isinstance(item, ToolResultOutput):
             self._handle_tool_result(item)
+        elif isinstance(item, CheckpointOutput):
+            self._handle_checkpoint(item)
 
     def finish_turn(self) -> None:
         """Call after agent turn completes to ensure trailing newline."""
@@ -87,6 +90,18 @@ class Renderer:
             self._after_tool = False
         self._in_text = True
         print(item.text, end="", file=self._text_stream(), flush=True)
+
+    def _handle_checkpoint(self, item: CheckpointOutput) -> None:
+        if self._in_text:
+            print(file=self._text_stream())
+            self._in_text = False
+        print(
+            f"\n  ◆ checkpoint — {item.replaced_count} messages summarised, "
+            f"~{item.tokens_before:,} → ~{item.tokens_after:,} tokens",
+            file=self._status_stream(),
+            flush=True,
+        )
+        self._after_tool = True
 
     def _handle_tool_call(self, item: ToolCallOutput) -> None:
         if self._in_text:

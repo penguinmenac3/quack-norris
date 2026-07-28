@@ -17,6 +17,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Union
 
+from quack_norris.core.context import (
+    CheckpointOutput,
+    ContextPolicy,
+    apply_context_policy,
+    truncate_tool_result,
+)
 from quack_norris.core.llm import (
     LLM,
     ApprovalState,
@@ -34,6 +40,10 @@ from quack_norris.core.llm import (
 __all__ = [
     "agent",
     "AgentOutput",
+    "CheckpointOutput",
+    "ContextPolicy",
+    "MessageEnd",
+    "NudgeOutput",
     "TextOutput",
     "ThinkingOutput",
     "ToolCallOutput",
@@ -78,7 +88,40 @@ class ToolResultOutput:
     show_output: bool = False  # Mirror of Tool.show_output — renderer prints content if True
 
 
-AgentOutput = TextOutput | ThinkingOutput | ToolCallOutput | ToolResultOutput
+@dataclass
+class MessageEnd:
+    """One assistant message is complete (one iteration of the loop).
+
+    Emitted for every assistant message, not just the last one of a turn, so
+    that a listener persisting the conversation can record each of them.  A
+    replay of those records then reproduces the in-memory history message for
+    message, which is what makes checkpoint ``replaced_count`` meaningful.
+    """
+
+    text: str
+    tool_call_ids: list[str]
+
+
+@dataclass
+class NudgeOutput:
+    """A synthetic user message the loop injected (e.g. after an empty reply).
+
+    Also emitted for persistence: it is a real message in the history and
+    would otherwise make a replay drift out of sync by one.
+    """
+
+    text: str
+
+
+AgentOutput = (
+    TextOutput
+    | ThinkingOutput
+    | ToolCallOutput
+    | ToolResultOutput
+    | MessageEnd
+    | NudgeOutput
+    | CheckpointOutput
+)
 
 # ---------------------------------------------------------------------------
 # Agent loop
@@ -97,6 +140,7 @@ async def agent(
     chat_history: list[ChatMessage],
     on_permission_request: Callable[[ToolCallOutput], Awaitable[bool]],
     on_output: Callable[[AgentOutput], Awaitable[None]],
+    context: ContextPolicy | None = None,
 ) -> str:
     """
     Run the agent loop until the LLM produces a final text response.
@@ -121,6 +165,12 @@ async def agent(
         is ``"human"`` the whitelist is skipped and this is called directly.
     on_output:
         Called for every :class:`AgentOutput` item as it arrives.
+    context:
+        Context window management policy.  When given, the history is brought
+        back within budget before every LLM call — stale tool output stripped,
+        and the oldest messages summarised into a checkpoint once utilisation
+        gets too high — and oversized tool results are clipped.  When ``None``
+        the history grows unbounded.
 
     Returns
     -------
@@ -131,6 +181,20 @@ async def agent(
     _get_prompt = system_prompt if callable(system_prompt) else lambda: system_prompt
 
     for _iteration in range(_MAX_ITERATIONS):
+        # ------------------------------------------------------------------ #
+        # Keep the context within budget before spending it                    #
+        # ------------------------------------------------------------------ #
+        if context is not None:
+            checkpoint = await apply_context_policy(
+                history=history,
+                policy=context,
+                model=model,
+                system_prompt=_get_prompt(),
+                tools=tools,
+            )
+            if checkpoint is not None:
+                await on_output(checkpoint)
+
         # ------------------------------------------------------------------ #
         # Call the LLM                                                         #
         # ------------------------------------------------------------------ #
@@ -158,17 +222,22 @@ async def agent(
             await on_output(TextOutput(text=suffix))
             full_text = "".join(text_chunks) + suffix
             history.append(AssistantMessage(content=full_text, tool_calls=[]))
+            await on_output(MessageEnd(text=full_text, tool_call_ids=[]))
             return full_text
 
         full_text = "".join(text_chunks)
 
         history.append(AssistantMessage(content=full_text, tool_calls=tool_calls))
+        await on_output(MessageEnd(
+            text=full_text, tool_call_ids=[tc.id for tc in tool_calls],
+        ))
 
         # ------------------------------------------------------------------ #
         # Empty response (no text, no tool calls) → nudge and retry           #
         # ------------------------------------------------------------------ #
         if not full_text and not tool_calls:
             history.append(UserMessage(content=_EMPTY_RESPONSE_NUDGE))
+            await on_output(NudgeOutput(text=_EMPTY_RESPONSE_NUDGE))
             continue
 
         # ------------------------------------------------------------------ #
@@ -233,6 +302,13 @@ async def agent(
                 history.extend(tool_results)
                 full_text = full_text + f"\n\n{_INTERRUPTED}"
                 return full_text
+
+            if context is not None and tc.truncation_allowed:
+                result.content = truncate_tool_result(
+                    result.content,
+                    context.config.max_tool_output,
+                    context.overflow_sink,
+                )
 
             await on_output(ToolResultOutput(
                 tool_call_id=tc.id,

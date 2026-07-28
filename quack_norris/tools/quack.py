@@ -169,6 +169,8 @@ def make_quack_tools(ctx: QuackContext) -> list:
             if isinstance(item, TextOutput):
                 collected.append(item.text)
 
+        from quack_norris.cli.context import build_context_policy
+
         result = await run_agent(
             model=model,
             system_prompt=sub_prompt,
@@ -176,6 +178,9 @@ def make_quack_tools(ctx: QuackContext) -> list:
             chat_history=history,
             on_permission_request=auto_deny_async,
             on_output=_noop_output,
+            # A subagent's history is throwaway, so it is never persisted and
+            # never checkpoint-replayed — but it still has to fit the window.
+            context=build_context_policy(model),
         )
         return ToolResult(content=result or "".join(collected))
 
@@ -183,7 +188,9 @@ def make_quack_tools(ctx: QuackContext) -> list:
     # use_skill (no approval)
     # ------------------------------------------------------------------
 
-    @tool
+    # Skill instructions must arrive whole — half a procedure is worse than
+    # none, and the model has no way to tell it is following a clipped one.
+    @tool(truncation_allowed=False)
     def use_skill(
         name: Annotated[str, Param("Skill name to load (use list_skills to see options)")],
     ) -> ToolResult:

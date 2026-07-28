@@ -6,12 +6,17 @@
 defaults:
   model: ollama/qwen3:14b   # default model, "group/model-name"; overridable via --model
 
-# History compaction settings (all optional; defaults shown below)
-compaction:
-  enabled: true    # auto-compaction on/off; manual /compact is unaffected
-  threshold: 0.80  # fraction of the model's context window that triggers auto-compaction
-  target: 0.30     # fraction of the context window kept as an un-summarised tail after compacting
-  min_turns: 8     # minimum chat history length before auto-compaction can trigger
+# Context window management (all optional; defaults shown below).
+# `verbatim` and `checkpoint_at` are fractions of the model's context window —
+# set `context_window` on each llms: entry below, or they measure against the
+# wrong size.  `checkpoint_reduction_rate` is a fraction of the history itself.
+context_management:
+  enabled: true                   # on/off; manual /compact is unaffected
+  verbatim: 0.30                  # newest slice kept fully intact; older tool output is redacted
+  checkpoint_at: 0.80             # utilisation that triggers a checkpoint
+  checkpoint_reduction_rate: 0.5  # share of the history each checkpoint summarises away
+  max_tool_output: 4096           # per-result cap in tokens; head and tail are kept
+  summarizer_model: null          # model used for checkpoint summaries; null = the conversation's model
 
 llms:
   - group: ollama
@@ -29,7 +34,7 @@ llms:
       - gpt-4o-mini
       - o3
 
-  - group: nexus
+  - group: bedrock
     provider: AWSBedrock
     api_endpoint: https://bedrock.my-corp.example.com
     api_key: ${AWS_BEARER_TOKEN_BEDROCK}

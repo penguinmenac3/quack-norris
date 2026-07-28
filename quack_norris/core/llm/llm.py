@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from quack_norris.core.llm.config import (
-    CompactionConfig,
+    ContextManagementConfig,
     LLMConfig,
     load_yaml,
     merge_raw_configs,
-    parse_compaction_config,
+    parse_context_management_config,
     parse_default_model,
     parse_llm_configs,
 )
@@ -114,7 +114,7 @@ class LLM:
     _model_map: dict[str, _AnyProvider] = {}
     _configs: list[LLMConfig] = []
     _default_model: str | None = None
-    _compaction_config: CompactionConfig = CompactionConfig()
+    _context_config: ContextManagementConfig = ContextManagementConfig()
 
     # ------------------------------------------------------------------
     # Setup
@@ -165,7 +165,7 @@ class LLM:
         configs = parse_llm_configs(raw)
         cls._configs = configs
         cls._default_model = parse_default_model(raw)
-        cls._compaction_config = parse_compaction_config(raw)
+        cls._context_config = parse_context_management_config(raw)
         cls._groups = {}
         cls._model_map = {}
 
@@ -264,6 +264,7 @@ class LLM:
                         lambda _t=matched, _a=_args: _t.approval_display(_a)
                     )
                     item.show_output = matched.show_output
+                    item.truncation_allowed = matched.truncation_allowed
             yield item
 
     # ------------------------------------------------------------------
@@ -313,9 +314,9 @@ class LLM:
         return cls._default_model
 
     @classmethod
-    def compaction_config(cls) -> CompactionConfig:
-        """Return the ``compaction:`` settings from config (defaults if unset)."""
-        return cls._compaction_config
+    def context_config(cls) -> ContextManagementConfig:
+        """Return the ``context_management:`` settings from config (defaults if unset)."""
+        return cls._context_config
 
     @classmethod
     def get_context_window(cls, prefixed_model: str) -> int:

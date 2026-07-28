@@ -49,7 +49,7 @@ Events are written in order. The `id` field equals the 0-based line number. Read
 
 ### Content only — no session config in the log
 
-`session.jsonl` contains only conversation events: user messages, agent responses, tool calls, system hints, compaction events, and errors. Session config (name, agent, model, cwd) is stored exclusively in `meta.json` and never appears in the log.
+`session.jsonl` contains only conversation events: user messages, agent responses, tool calls, system hints, checkpoints, and errors. Session config (name, agent, model, cwd) is stored exclusively in `meta.json` and never appears in the log.
 
 The first line of the log is the first `user_message` event.
 

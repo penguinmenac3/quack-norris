@@ -2,7 +2,7 @@
 
 Uses the same config format as quack-norris-2.0 so existing configs work
 unchanged.  The file may be named anything (``config.yaml``, ``llms.yaml``,
-etc.); only the ``llms:``, ``defaults:``, and ``compaction:`` keys are
+etc.); only the ``llms:``, ``defaults:``, and ``context_management:`` keys are
 consumed here.
 
 :class:`~quack_norris.core.llm.llm.LLM`'s ``setup()`` merges a global config
@@ -73,22 +73,38 @@ class LLMConfig:
 
 
 @dataclass
-class CompactionConfig:
-    """History compaction settings, read from the ``compaction:`` key.
+class ContextManagementConfig:
+    """Context window management, read from the ``context_management:`` key.
+
+    Walking from the newest message backwards, history is tiered:
+
+    - the newest ``verbatim`` share of the window stays completely intact;
+    - everything older has its tool outputs redacted in memory;
+    - once utilisation reaches ``checkpoint_at``, the oldest
+      ``checkpoint_reduction_rate`` of the history is summarised into a
+      checkpoint.
+
+    ``verbatim`` and ``checkpoint_at`` are fractions of the context window;
+    ``checkpoint_reduction_rate`` is a fraction of the history itself, so a
+    checkpoint always removes a predictable share of what is actually there.
 
     Format::
 
-        compaction:
-          enabled: true      # auto-compaction on/off (manual /compact is unaffected)
-          threshold: 0.80    # fraction of context window that triggers auto-compaction
-          target: 0.30       # fraction of context window kept as an un-summarised tail
-          min_turns: 8       # minimum chat history length before auto-compaction can trigger
+        context_management:
+          enabled: true
+          verbatim: 0.30                 # newest slice kept fully intact
+          checkpoint_at: 0.80            # utilisation that triggers a checkpoint
+          checkpoint_reduction_rate: 0.5 # share of history a checkpoint removes
+          max_tool_output: 4096          # per-result cap in tokens, head+tail kept
+          summarizer_model: null         # falls back to the conversation's model
     """
 
     enabled: bool = True
-    threshold: float = 0.80
-    target: float = 0.30
-    min_turns: int = 8
+    verbatim: float = 0.30
+    checkpoint_at: float = 0.80
+    checkpoint_reduction_rate: float = 0.5
+    max_tool_output: int = 4096
+    summarizer_model: str | None = None
 
 
 def _resolve_env(value: str) -> str:
@@ -114,7 +130,7 @@ def merge_raw_configs(base: dict[str, Any], override: dict[str, Any]) -> dict[st
 
     - Keys present only in one side are kept as-is.
     - If both sides have a ``dict`` value for the same key (e.g. ``defaults``,
-      ``compaction``), the dicts are merged key-by-key with *override* winning
+      ``context_management``), the dicts are merged key-by-key with *override* winning
       — so *override* doesn't need to repeat every setting.
     - Any other key present in both (including ``llms``, a list) is fully
       replaced by *override*'s value.
@@ -141,21 +157,26 @@ def parse_default_model(raw: dict[str, Any]) -> str | None:
     return None
 
 
-def parse_compaction_config(raw: dict[str, Any]) -> CompactionConfig:
-    """Return the ``compaction:`` settings from a raw config dict.
-
-    Missing keys/section fall back to :class:`CompactionConfig` defaults.
-    """
-    defaults = CompactionConfig()
-    data = raw.get("compaction")
+def parse_context_management_config(raw: dict[str, Any]) -> ContextManagementConfig:
+    """Return the ``context_management:`` settings from a raw config dict."""
+    defaults = ContextManagementConfig()
+    data = raw.get("context_management")
     if not isinstance(data, dict):
         return defaults
 
-    return CompactionConfig(
+    summarizer = data.get("summarizer_model", defaults.summarizer_model)
+    rate = float(data.get(
+        "checkpoint_reduction_rate", defaults.checkpoint_reduction_rate,
+    ))
+    return ContextManagementConfig(
         enabled=bool(data.get("enabled", defaults.enabled)),
-        threshold=float(data.get("threshold", defaults.threshold)),
-        target=float(data.get("target", defaults.target)),
-        min_turns=int(data.get("min_turns", defaults.min_turns)),
+        verbatim=float(data.get("verbatim", defaults.verbatim)),
+        checkpoint_at=float(data.get("checkpoint_at", defaults.checkpoint_at)),
+        # A rate of 1.0 would summarise the entire history including the
+        # newest message, leaving the model nothing concrete to work from.
+        checkpoint_reduction_rate=min(max(rate, 0.0), 0.95),
+        max_tool_output=int(data.get("max_tool_output", defaults.max_tool_output)),
+        summarizer_model=str(summarizer) if summarizer else None,
     )
 
 
@@ -210,15 +231,15 @@ def load_default_model(path: Path) -> str | None:
         return None
 
 
-def load_compaction_config(path: Path) -> CompactionConfig:
-    """Return the ``compaction:`` settings from the config file.
+def load_context_management_config(path: Path) -> ContextManagementConfig:
+    """Return the ``context_management:`` settings from the config file.
 
     A missing or unparsable file/section returns all defaults.
     """
     try:
-        return parse_compaction_config(load_yaml(path))
+        return parse_context_management_config(load_yaml(path))
     except Exception:  # noqa: BLE001
-        return CompactionConfig()
+        return ContextManagementConfig()
 
 
 def load_llm_configs(path: Path) -> list[LLMConfig]:

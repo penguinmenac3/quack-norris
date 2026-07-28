@@ -92,6 +92,7 @@ class ToolCallRequest:
         default=None, repr=False, compare=False
     )
     show_output: bool = field(default=False, compare=False)
+    truncation_allowed: bool = field(default=True, compare=False)
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +167,14 @@ class Tool:
     needs_approval: ApprovalState | Callable[[dict[str, Any]], ApprovalState] = False
     show_output: bool = False  # If True, the renderer prints the tool result content
 
+    # If False, this tool's result is exempt from the ``max_tool_output`` cap.
+    # For tools whose output is instructions rather than data — a loaded skill,
+    # say — a clipped result is worse than useless: the model silently follows
+    # half a procedure.  Such output is still redacted wholesale once it ages
+    # out of the verbatim window, which is safe because the model can simply
+    # load it again.
+    truncation_allowed: bool = True
+
     # Optional intercept hooks — see class docstring.
     pre_execute_hook: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     post_execute_hook: Callable[[ToolResult], ToolResult] | None = None
@@ -232,7 +241,12 @@ def _json_type(base: Any) -> str:
     return _PY_TO_JSON.get(base, "string")
 
 
-def _build_tool(fn: Callable[..., Any], needs_approval: ApprovalState | Callable[[dict[str, Any]], ApprovalState], show_output: bool = False) -> Tool:
+def _build_tool(
+    fn: Callable[..., Any],
+    needs_approval: ApprovalState | Callable[[dict[str, Any]], ApprovalState],
+    show_output: bool = False,
+    truncation_allowed: bool = True,
+) -> Tool:
     sig = inspect.signature(fn)
     try:
         hints = get_type_hints(fn, include_extras=True)
@@ -267,6 +281,7 @@ def _build_tool(fn: Callable[..., Any], needs_approval: ApprovalState | Callable
     _FnTool.required = required
     _FnTool.needs_approval = needs_approval
     _FnTool.show_output = show_output
+    _FnTool.truncation_allowed = truncation_allowed
 
     async def _execute(self: Tool, **kwargs: Any) -> ToolResult:
         try:
@@ -322,6 +337,7 @@ def tool(
     *,
     needs_approval: ApprovalState | Callable[[dict[str, Any]], ApprovalState] = False,
     show_output: bool = False,
+    truncation_allowed: bool = True,
 ) -> Any:
     """
     Decorator that turns a function into a :class:`Tool`.
@@ -347,6 +363,11 @@ def tool(
         return _build_tool(fn, needs_approval=False, show_output=False)
 
     def _decorator(f: Callable[..., Any]) -> Tool:
-        return _build_tool(f, needs_approval=needs_approval, show_output=show_output)
+        return _build_tool(
+            f,
+            needs_approval=needs_approval,
+            show_output=show_output,
+            truncation_allowed=truncation_allowed,
+        )
 
     return _decorator

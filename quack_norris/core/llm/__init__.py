@@ -11,7 +11,7 @@ Public surface::
 Model strings use the ``group/model-name`` convention — identical to
 quack-norris-2.0 — e.g. ``"ollama/qwen3:14b"`` or ``"openai/gpt-4o"``.
 
-Config format (``defaults:``, ``compaction:``, ``llms:`` keys in any YAML file;
+Config format (``defaults:``, ``context_management:``, ``llms:`` keys in any YAML file;
 see :mod:`quack_norris.core.llm.config` for the full merge semantics)::
 
     defaults:
@@ -38,14 +38,16 @@ see :mod:`quack_norris.core.llm.config` for the full merge semantics)::
         api_version: "2024-02-01"
 """
 
-from quack_norris.core.llm.config import CompactionConfig
+from quack_norris.core.llm.config import ContextManagementConfig
 from quack_norris.core.llm.llm import LLM
 from quack_norris.core.llm.provider import (
     AssistantMessage,
     ChatMessage,
+    CheckpointMessage,
     LLMOutput,
     TextDelta,
     ThinkingDelta,
+    ToolDefinition,
     ToolResultMessage,
     UsageInfo,
     UserMessage,
@@ -55,7 +57,8 @@ from quack_norris.core.llm.tool import ApprovalState, Param, Tool, ToolCallReque
 __all__ = [
     # Facade
     "LLM",
-    "CompactionConfig",
+    "ContextManagementConfig",
+    "ToolDefinition",
     # Tool primitives
     "tool",
     "Param",
@@ -73,4 +76,5 @@ __all__ = [
     "UserMessage",
     "AssistantMessage",
     "ToolResultMessage",
+    "CheckpointMessage",
 ]

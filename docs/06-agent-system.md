@@ -39,32 +39,40 @@ All `emit` operations write to `session.jsonl` and broadcast to connected socket
 
 ### Context Management
 
-Before each LLM call, the agent builds the context to send to the LLM:
+History is kept within the context window by `core/context.py`, which runs before **every** LLM call — including between tool-calling iterations, where a single turn can otherwise blow the window on its own. Walking backwards from the newest message, history is tiered:
 
-1. Find the `history_compacted` event with the highest `cutoff_id` (if any exist in `session.jsonl`)
-2. Build context: system prompt + `[Previous conversation summary]: <summary>` (if compacted) + all events with `id > cutoff_id`
-3. Estimate tokens (~4 chars/token heuristic)
-4. If tokens exceed `compaction.threshold` (default: 80% of context window), `compaction.enabled` is true, and the session has at least `compaction.min_turns` turn pairs:
-   - Call the LLM to summarise all history up to the current turn
-   - Append a `history_compacted` event to `session.jsonl` with `cutoff_id` and the summary text
-   - Rebuild context from the new summary + tail
-   - Do not compact again for the rest of this turn
-5. If tokens still exceed the window after compaction (extremely long single turn): truncate from the oldest tail events, keeping tool call / tool result pairs intact
-6. System prompt is always included, never trimmed
+1. **Verbatim (short-term).** The newest `verbatim` share of the window stays completely intact.
+2. **Stripped (mid-term).** Everything older keeps its user and assistant text but has tool outputs replaced with a redaction placeholder. The agent can re-run the tool if it needs the output again.
+3. **Checkpoint (long-term).** Once utilisation reaches `checkpoint_at`, the oldest `checkpoint_reduction_rate` of the history is summarised into a `CheckpointMessage`.
 
-Compaction fires at most once per agent loop iteration — not on every turn, only when the threshold is crossed. Raw events before the `cutoff_id` remain in `session.jsonl` permanently and are visible in the Web UI history view, but are excluded from the LLM context.
+The reduction rate is a share of the **history**, not of the window. Sizing it against the history means a checkpoint always removes a predictable amount of what is actually there, regardless of window size or how much of it the system prompt and tool schemas consume.
 
-Configurable in `~/.quack-norris/config.yaml`:
+Each call: measure system prompt + tool schemas + history → strip → checkpoint only if still over. Stripping alone keeps most sessions under the threshold indefinitely, so summarisation is rare.
+
+Two invariants matter:
+
+- **Cuts never orphan a tool result.** Cut points are rounded forward past `ToolResultMessage`s, so an assistant message and all of its results are dropped as one block. A result whose `tool_call_id` no longer appears in the history is rejected outright by providers.
+- **The system prompt is always included, never trimmed.**
+
+Individual tool results are separately capped at `max_tool_output` tokens, keeping head *and* tail (stack traces and exit codes live at the end); the CLI spills the full text to `<session>/overflow/` and points the agent at the path.
+
+Raw events remain in `session.jsonl` permanently and are visible in the Web UI history view, regardless of what the LLM context currently holds.
+
+Configurable in `~/.quack-norris/config.yaml`. `verbatim` and `checkpoint_at` are fractions of the model's `context_window`; `checkpoint_reduction_rate` is a fraction of the history:
 
 ```yaml
-compaction:
-  threshold: 0.80   # compact when history exceeds this fraction of context window
-  target: 0.40      # target this fraction for the summary (controls compression aggressiveness)
-  min_turns: 4      # never compact if fewer than this many user/agent turn pairs exist
-  enabled: true     # set to false to disable auto-compaction entirely
+context_management:
+  enabled: true                   # set to false to disable automatic management entirely
+  verbatim: 0.30                  # newest slice kept fully intact
+  checkpoint_at: 0.80             # utilisation that triggers a checkpoint
+  checkpoint_reduction_rate: 0.5  # share of the history a checkpoint summarises away
+  max_tool_output: 4096           # per-result cap in tokens
+  summarizer_model: null          # null = use the conversation's model
 ```
 
-The user can also trigger compaction manually with `/compact` at the `> ` prompt (see [04-cli.md](04-cli.md)).
+A tool can opt out of the `max_tool_output` cap with `@tool(truncation_allowed=False)`. This is for tools whose output is *instructions* rather than data — `use_skill`, for instance — where a clipped result is worse than none, because the model has no way to tell it is following half a procedure. Exempt output is still redacted wholesale once it ages out of the verbatim window, which is safe: the model can simply load it again.
+
+The user can also checkpoint manually with `/compact` at the `> ` prompt (see [04-cli.md](04-cli.md)).
 
 ### History Repair
 

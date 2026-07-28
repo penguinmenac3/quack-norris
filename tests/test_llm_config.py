@@ -148,11 +148,14 @@ def test_parse_default_model_ignores_legacy_flat_key() -> None:
 # ---------------------------------------------------------------------------
 
 def test_merge_raw_configs_override_extends_base() -> None:
-    base = {"defaults": {"model": "ollama/a"}, "compaction": {"threshold": 0.8, "min_turns": 8}}
-    override = {"compaction": {"threshold": 0.5}}
+    base = {
+        "defaults": {"model": "ollama/a"},
+        "context_management": {"checkpoint_at": 0.8, "verbatim": 0.3},
+    }
+    override = {"context_management": {"checkpoint_at": 0.5}}
     merged = merge_raw_configs(base, override)
     assert merged["defaults"] == {"model": "ollama/a"}
-    assert merged["compaction"] == {"threshold": 0.5, "min_turns": 8}
+    assert merged["context_management"] == {"checkpoint_at": 0.5, "verbatim": 0.3}
 
 
 def test_merge_raw_configs_override_replaces_lists() -> None:

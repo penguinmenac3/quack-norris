@@ -13,6 +13,10 @@ import quack_norris.core.llm as llm_module
 EXPECTED_AGENT_EXPORTS = {
     "agent",
     "AgentOutput",
+    "CheckpointOutput",
+    "ContextPolicy",
+    "MessageEnd",
+    "NudgeOutput",
     "TextOutput",
     "ThinkingOutput",
     "ToolCallOutput",
@@ -60,7 +64,9 @@ def test_agent_does_not_export_llm_symbols() -> None:
 
 EXPECTED_LLM_EXPORTS = {
     "LLM",
-    "CompactionConfig",
+    "ContextManagementConfig",
+    "ToolDefinition",
+    "CheckpointMessage",
     "tool",
     "Param",
     "Tool",

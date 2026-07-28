@@ -124,7 +124,7 @@ Slash commands are processed at the `> ` prompt before the agent sees them. They
 | `/agent <name>` | Switch agent immediately |
 | `/model <name>` | Switch model immediately |
 | `/project <cwd>` | Change project working directory immediately |
-| `/compact` | Trigger history compaction immediately |
+| `/compact` | Checkpoint the conversation history immediately |
 | `/help` | List slash commands |
 
 Config changes (`/agent`, `/model`, `/project`) apply **immediately**:
@@ -132,7 +132,7 @@ Config changes (`/agent`, `/model`, `/project`) apply **immediately**:
 - A `system_hint` event is appended to `session.jsonl` so the agent sees the change in its LLM context without being prompted to respond
 - If no user message has been sent yet, config is held in memory only — no session directory is created
 
-`/compact` runs compaction immediately regardless of token count, appends a `history_compacted` event, and prints `Compacting history... done.`
+`/compact` checkpoints immediately regardless of token count, appends a `checkpoint` event, and prints how many messages were summarised and the token delta.
 
 ---
 

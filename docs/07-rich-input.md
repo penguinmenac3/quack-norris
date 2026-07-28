@@ -277,16 +277,18 @@ def _parts_to_user_message(data: dict) -> UserMessage:
     return UserMessage(content=parts)
 ```
 
-### 4.6 `len(m.content)` in compaction estimate
+### 4.6 `len(m.content)` in the context estimate
 
-`_maybe_auto_compact()` uses `len(m.content)` to estimate tokens. Guard:
+`message_tokens()` in `core/context.py` uses `len(m.content)` to estimate tokens. Guard:
 
 ```python
 content = m.content if isinstance(m.content, str) else "".join(
     p.text for p in m.content if isinstance(p, TextPart)
 )
-total_chars += len(content)
+total += estimate_tokens(content)
 ```
+
+Note this only counts an image's *text* parts. Images cost real tokens, so the estimate will under-report until the accounting is image-aware.
 
 ---
 
@@ -295,7 +297,9 @@ total_chars += len(content)
 | File | Change |
 |---|---|
 | `cli/input.py` | **New.** `read_user_input()`, `UserInput`, `ImageData` |
-| `cli/__main__.py` | `_read_input()` delegates to `input.py`; `_log_user_message()` stores parts; `_build_chat_history()` handles parts; compaction estimate guard |
+| `cli/__main__.py` | `_read_input()` delegates to `input.py`; `_log_user_message()` stores parts |
+| `cli/context.py` | `replay_messages()` reconstructs content parts |
+| `core/context.py` | `message_tokens()` guard for non-str content |
 | `core/llm/provider.py` | `TextPart`, `ImagePart` dataclasses; `UserMessage.content` becomes union |
 | `core/llm/providers/openai.py` | `_encode_content()` helper; use in `_encode_messages()` |
 | `core/llm/providers/bedrock.py` | Image encoding in `_encode_messages()` |
@@ -318,5 +322,5 @@ total_chars += len(content)
 2. **`core/llm/provider.py`** — Add `TextPart` / `ImagePart`, update `UserMessage`.
 3. **`core/llm/providers/openai.py`** — `_encode_content()`.
 4. **`core/llm/providers/bedrock.py`** — image encoding.
-5. **`cli/__main__.py`** — image detection in `_read_input()`, `_log_user_message()` parts storage, `_build_chat_history()` reconstruction, compaction guard.
+5. **`cli/__main__.py`** — image detection in `_read_input()`, `_log_user_message()` parts storage; `replay_messages()` reconstruction in `cli/context.py`; `message_tokens()` guard in `core/context.py`.
 6. **Tests** — unit tests for `input.py`; integration test sending an image to a mock provider.

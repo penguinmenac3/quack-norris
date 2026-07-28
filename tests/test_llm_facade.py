@@ -142,8 +142,8 @@ def test_setup_merges_global_and_local(tmp_path: Path, monkeypatch: pytest.Monke
     local = _yaml(
         tmp_path,
         """
-        compaction:
-          threshold: 0.5
+        context_management:
+          checkpoint_at: 0.5
         """,
     )
     LLM.setup(local)
@@ -151,9 +151,9 @@ def test_setup_merges_global_and_local(tmp_path: Path, monkeypatch: pytest.Monke
     assert LLM.groups() == ["ollama"]
     # Global default_model survives since local didn't set defaults.model.
     assert LLM.default_model() == "ollama/global-model"
-    # Local compaction.threshold overrides; unset fields keep global defaults.
-    assert LLM.compaction_config().threshold == 0.5
-    assert LLM.compaction_config().min_turns == 8
+    # Local checkpoint_at overrides; unset fields keep their defaults.
+    assert LLM.context_config().checkpoint_at == 0.5
+    assert LLM.context_config().verbatim == 0.30
 
 
 def test_setup_local_overrides_global_llms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

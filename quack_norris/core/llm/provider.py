@@ -56,6 +56,24 @@ class UserMessage:
 
 
 @dataclass
+class CheckpointMessage(UserMessage):
+    """A summary standing in for a dropped prefix of the conversation.
+
+    Wire-wise this *is* a user message — providers dispatch on ``role`` and see
+    ``"user"`` — but it stays a distinct type in memory so history
+    reconstruction can tell a checkpoint apart from something the human typed.
+
+    ``replaced_count`` is the number of messages it stands in for, counted
+    against the *raw* message list replayed from storage (not the current
+    in-memory list).  Checkpoints therefore subsume each other: a later
+    checkpoint always has a larger count and its summary already folds in the
+    earlier one.
+    """
+
+    replaced_count: int = 0
+
+
+@dataclass
 class AssistantMessage:
     role: Literal["assistant"] = field(default="assistant", init=False)
     content: str

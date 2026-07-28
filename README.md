@@ -13,7 +13,7 @@ Quack Norris is three things:
 - **Tool execution** — shell (`pwsh`/`bash`), file operations (`file_view`, `file_write`, `file_str_replace`, `file_move`, `file_delete`), and `quack` runtime tools
 - **Approval system** — three-state approval (`auto` / `whitelist→human` / `always human`); per-call dynamic decisions; glob whitelist at session, project, and global scope
 - **Session management** — persistent append-only JSONL event log; resume, list, archive sessions; auto-generated session names
-- **History compaction** — automatic and manual (`/compact`) summarisation when context window fills; configurable threshold/target/min-turns
+- **Context management** — three-tier memory: a verbatim window of recent messages, tool-output redaction beyond it, and LLM-summarised checkpoints once the window fills; per-result output caps; manual `/compact`
 - **Agent system** — load `*.agent.md` definitions from global `~/.quack-norris/agents/` or project `.agents/`; switch live with `/agent`
 - **Multi-provider LLM** — Ollama, OpenAI, Azure OpenAI, AWS Bedrock, and any OpenAI-compatible endpoint
 - **Background processes** — long-running shell commands promoted to background handles (`bg-xxxx`) with `check_tool` / `await_tool` / `kill_tool`
@@ -38,23 +38,25 @@ quack-norris --prompt "Summarise the auth module"   # non-interactive
 
 ## LLM config
 
-Config is loaded from `~/.quack-norris/config.yaml` (global) with a project-local `llms.yaml` merged on top. `defaults` and `compaction` are merged key-by-key; `llms:` is fully replaced if the local file defines it.
+Config is loaded from `~/.quack-norris/config.yaml` (global) with a project-local `llms.yaml` merged on top. `defaults` and `context_management` are merged key-by-key; `llms:` is fully replaced if the local file defines it.
 
 ```yaml
 defaults:
   model: ollama/qwen3:14b
 
-compaction:
+context_management:               # all optional; defaults shown
   enabled: true
-  threshold: 0.80   # auto-compact at 80 % of context window
-  target: 0.30      # keep 30 % as un-summarised tail
-  min_turns: 8
+  verbatim: 0.30                  # newest slice kept fully intact
+  checkpoint_at: 0.80             # utilisation that triggers a checkpoint
+  checkpoint_reduction_rate: 0.5  # share of the history a checkpoint removes
+  max_tool_output: 4096           # per-result cap in tokens
 
 llms:
   - group: ollama
     provider: OpenAI
     api_endpoint: http://localhost:11434/v1
     api_key: ollama
+    context_window: 4096   # fractions above are measured against this
 
   - group: openai
     provider: OpenAI
@@ -105,7 +107,7 @@ quack-norris [--resume [id]] [--prompt <text>] [--prompt-file <file>]
 | `/agent <name>` | Switch agent definition live |
 | `/model <name>` | Switch LLM live |
 | `/project <dir>` | Change project working directory live |
-| `/compact` | Manually trigger history compaction |
+| `/compact` | Manually checkpoint the conversation history |
 | `/archive` | Archive session and exit |
 | `/help` | List all slash commands |
 | `/exit` / `/quit` | Exit the REPL |

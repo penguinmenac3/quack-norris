@@ -119,6 +119,60 @@ async def test_tool_call_then_text() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("truncation_allowed", "expect_clipped"),
+    [(True, True), (False, False)],
+)
+async def test_tool_output_cap_honours_truncation_allowed(
+    truncation_allowed: bool, expect_clipped: bool,
+) -> None:
+    """Tools whose output is instructions can opt out of the per-result cap."""
+    from quack_norris.core.context import ContextPolicy
+    from quack_norris.core.llm import ContextManagementConfig
+    from quack_norris.core.llm.provider import ToolResultMessage
+
+    payload = "x" * 8000
+    tool = EchoTool()
+    outputs: list[AgentOutput] = []
+    history = [UserMessage(content="go")]
+    call_count = 0
+
+    async def fake_converse(model, system_prompt, tools, chat_history):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            tc = ToolCallRequest(id="tc1", name="echo", arguments={"message": payload})
+            tc.execute = lambda **kwargs: tool.execute(**kwargs)
+            tc.needs_approval = False
+            tc.truncation_allowed = truncation_allowed
+            return _stream(tc)
+        return _stream(TextDelta(text="Done"))
+
+    policy = ContextPolicy(
+        config=ContextManagementConfig(max_tool_output=100),
+        context_window=100_000,
+    )
+
+    with patch("quack_norris.core.agent.LLM.converse", side_effect=fake_converse):
+        await agent(
+            model="ollama/test",
+            system_prompt="sys",
+            tools=[tool],
+            chat_history=history,
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender(outputs),
+            context=policy,
+        )
+
+    results = [m for m in history if isinstance(m, ToolResultMessage)]
+    assert len(results) == 1
+    assert ("clipped" in results[0].content) is expect_clipped
+    # The exempt path must deliver the payload whole, not merely uncut.
+    if not expect_clipped:
+        assert results[0].content == payload
+
+
+@pytest.mark.asyncio
 async def test_tool_call_denied() -> None:
     """Denied tool call results in an error result message."""
     tool = ApprovalTool()

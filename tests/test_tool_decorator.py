@@ -45,6 +45,21 @@ def sync_upper(
     return text.upper()
 
 
+@tool(truncation_allowed=False)
+def load_instructions() -> str:
+    """Return instructions that must not be clipped."""
+    return "step 1 ... step 99"
+
+
+def test_truncation_allowed_defaults_to_true() -> None:
+    assert add.truncation_allowed is True
+    assert risky.truncation_allowed is True
+
+
+def test_truncation_allowed_can_be_opted_out() -> None:
+    assert load_instructions.truncation_allowed is False
+
+
 @tool
 async def with_default(
     text: Annotated[str, Param("Input text")],

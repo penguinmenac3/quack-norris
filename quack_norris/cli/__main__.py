@@ -25,7 +25,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quack_norris.cli.approval import auto_deny_async, interactive_approval
-from quack_norris.cli.compaction import compact_history, reconstruct_tail
+from quack_norris.cli.context import (
+    build_chat_history,
+    build_context_policy,
+    force_checkpoint,
+    log_checkpoint,
+)
 from quack_norris.cli.renderer import Renderer
 from quack_norris.cli.session import (
     SessionMeta,
@@ -148,37 +153,6 @@ def _add_chat_args(p: argparse.ArgumentParser) -> None:
 
 
 # ---------------------------------------------------------------------------
-# History reconstruction from session.jsonl
-# ---------------------------------------------------------------------------
-
-def _build_chat_history(session_id: str) -> list[ChatMessage]:
-    """Reconstruct LLM chat history from the event log.
-
-    Handles history_compacted: if present, uses the summary as a system-role
-    UserMessage prefix and only includes events after cutoff_id.
-    """
-    events = read_events(session_id)
-    if not events:
-        return []
-
-    # Find most recent history_compacted event
-    compaction = None
-    for ev in reversed(events):
-        if ev.get("type") == "history_compacted":
-            compaction = ev
-            break
-
-    cutoff_id = compaction["data"]["cutoff_id"] if compaction else -1
-    summary = compaction["data"]["summary"] if compaction else None
-
-    history: list[ChatMessage] = []
-    if summary:
-        history.append(UserMessage(content=f"[Previous conversation summary]: {summary}"))
-    history.extend(reconstruct_tail(events, cutoff_id))
-    return history
-
-
-# ---------------------------------------------------------------------------
 # Event logging helpers (wrap append_event + touch_meta)
 # ---------------------------------------------------------------------------
 
@@ -268,48 +242,6 @@ async def _ask_user_auto_deny(question: str, choices: list[str]) -> str:
     return ""
 
 
-async def _maybe_auto_compact(
-    chat_history: list[ChatMessage],
-    model: str,
-    session_id: str,
-) -> None:
-    """Auto-compact history if it exceeds the token threshold.
-
-    Mutates ``chat_history`` in place.  Reads ``compaction.enabled``,
-    ``compaction.threshold``, ``compaction.target``, and
-    ``compaction.min_turns`` from the active LLM config (``CompactionConfig``
-    defaults if the config file has no ``compaction:`` section).
-    """
-    cfg = LLM.compaction_config()
-    if not cfg.enabled:
-        return
-
-    # Estimate token count (~4 chars per token heuristic)
-    total_chars = sum(
-        len(m.content) for m in chat_history if hasattr(m, "content")
-    )
-    estimated_tokens = total_chars // 4
-
-    context_window = LLM.get_context_window(model)
-    threshold = int(context_window * cfg.threshold)
-
-    if estimated_tokens < threshold:
-        return
-    if len(chat_history) < cfg.min_turns:
-        return
-
-    print("  [Auto-compacting history...]")
-    new_history = await compact_history(
-        chat_history=chat_history,
-        model=model,
-        session_id=session_id,
-        trigger="auto",
-        target_tokens=int(context_window * cfg.target),
-    )
-    if new_history is not chat_history:
-        chat_history[:] = new_history
-
-
 async def _run_turn(
     *,
     session_id: str,
@@ -343,20 +275,44 @@ async def _run_turn(
     message_id = _log_user_message(session_id, meta, text)
     chat_history.append(UserMessage(content=text))
 
-    response_message_id = f"m_{uuid.uuid4().hex[:8]}"
-    _log_content_start(session_id, response_message_id)
-
-    collected_text: list[str] = []
     pending_tool_approval: dict[str, bool] = {}  # call_id → approved
 
-    from quack_norris.core.agent import TextOutput, ThinkingOutput, ToolCallOutput, ToolResultOutput
+    from quack_norris.core.agent import (
+        CheckpointOutput,
+        MessageEnd,
+        NudgeOutput,
+        TextOutput,
+        ThinkingOutput,
+        ToolCallOutput,
+        ToolResultOutput,
+    )
+
+    # One content_start/content_end pair per assistant message, allocated
+    # lazily: the log then replays into exactly the same message list the
+    # agent holds in memory, which is what checkpoint offsets are counted in.
+    current_message_id: list[str | None] = [None]
+
+    def _message_id() -> str:
+        if current_message_id[0] is None:
+            current_message_id[0] = f"m_{uuid.uuid4().hex[:8]}"
+            _log_content_start(session_id, current_message_id[0])
+        return current_message_id[0]
 
     async def _on_output(item: AgentOutput) -> None:
         await renderer.on_output(item)
 
         if isinstance(item, TextOutput):
-            collected_text.append(item.text)
-            _log_content_delta(session_id, response_message_id, item.text)
+            _log_content_delta(session_id, _message_id(), item.text)
+
+        elif isinstance(item, MessageEnd):
+            _log_content_end(session_id, _message_id(), item.text)
+            current_message_id[0] = None
+
+        elif isinstance(item, NudgeOutput):
+            _log_system_hint(session_id, item.text)
+
+        elif isinstance(item, CheckpointOutput):
+            log_checkpoint(session_id, item, trigger="auto")
 
         elif isinstance(item, ToolCallOutput):
             _log_tool_call_start(session_id, item.tool_call_id, item.tool_name, item.arguments)
@@ -395,8 +351,6 @@ async def _run_turn(
         pending_tool_approval[call.tool_call_id] = approved
         return approved
 
-    await _maybe_auto_compact(chat_history, model, session_id)
-
     final_text = await agent(
         model=model,
         system_prompt=lambda: prompt_ref[0],
@@ -404,10 +358,10 @@ async def _run_turn(
         chat_history=chat_history,
         on_permission_request=_on_approval,
         on_output=_on_output,
+        context=build_context_policy(model, session_id),
     )
 
     renderer.finish_turn()
-    _log_content_end(session_id, response_message_id, final_text)
 
     if meta.name is None and session_exists(session_id):
         from quack_norris.cli.naming import generate_session_name
@@ -438,7 +392,7 @@ async def _run_interactive(
     whitelist.load(Path(meta.cwd) if meta.cwd else Path.cwd())
 
     renderer = Renderer(interactive=True)
-    chat_history = _build_chat_history(session_id)
+    chat_history = build_chat_history(session_id)
     system_prompt_parts: list[str] = []
 
     # Session-scoped background process registry — one per REPL session so
@@ -568,8 +522,8 @@ def _compute_usage(ctx: SlashContext) -> None:
     tool_calls_total = 0
     tool_calls_denied = 0
     tool_counts: dict[str, int] = {}
-    compactions_auto = 0
-    compactions_manual = 0
+    checkpoints_auto = 0
+    checkpoints_manual = 0
     total_chars_in = 0   # user + tool result content sent to LLM
     total_chars_out = 0  # assistant text generated
     today_chars_in = 0
@@ -615,12 +569,11 @@ def _compute_usage(ctx: SlashContext) -> None:
             total_chars_in += chars
             if _is_today(ts):
                 today_chars_in += chars
-        elif t == "history_compacted":
-            trigger = data.get("trigger", "manual")
-            if trigger == "auto":
-                compactions_auto += 1
+        elif t == "checkpoint":
+            if data.get("trigger") == "auto":
+                checkpoints_auto += 1
             else:
-                compactions_manual += 1
+                checkpoints_manual += 1
 
     total_chars = total_chars_in + total_chars_out
     est_total = total_chars // 4
@@ -628,13 +581,34 @@ def _compute_usage(ctx: SlashContext) -> None:
     est_out = total_chars_out // 4
     est_today = (today_chars_in + today_chars_out) // 4
 
-    # --- Active history token estimate ---
-    active_chars = sum(
-        len(m.content) for m in ctx.chat_history if hasattr(m, "content")
+    # --- Active context estimate ---
+    # Apply the same redaction pass the next LLM call would, so the number
+    # reported is what will actually be sent rather than the raw replayed
+    # history.  The pass is idempotent and happens on the next turn anyway.
+    from quack_norris.core.context import (
+        REDACTION_PLACEHOLDER,
+        measure,
+        strip_old_tool_results,
     )
-    est_active = active_chars // 4
-    context_window = LLM.get_context_window(ctx.model)
+    from quack_norris.core.llm import ToolResultMessage
+
+    policy = build_context_policy(ctx.model)
+    context_window = policy.context_window
+    usage = measure(ctx.chat_history, ctx.system_prompt, [], context_window)
+    if policy.config.enabled:
+        strip_old_tool_results(
+            ctx.chat_history,
+            usage.per_message,
+            int(usage.budget * policy.config.verbatim),
+        )
+    est_active = usage.overhead + sum(usage.per_message)
     active_pct = est_active * 100 // context_window if context_window else 0
+
+    # State, not a delta: how much of the history's tool output is currently
+    # redacted.  The strip pass is idempotent, so counting what a single call
+    # changed would report the full set once and zero every time after.
+    results = [m for m in ctx.chat_history if isinstance(m, ToolResultMessage)]
+    redacted = sum(1 for m in results if m.content == REDACTION_PLACEHOLDER)
 
     # --- Session age ---
     age_str = ""
@@ -648,7 +622,7 @@ def _compute_usage(ctx: SlashContext) -> None:
         except ValueError:
             pass
 
-    compaction_str = f"{compactions_auto} auto, {compactions_manual} manual"
+    checkpoint_str = f"{checkpoints_auto} auto, {checkpoints_manual} manual"
 
     lines = [
         "  ── Usage ──────────────────────────────────────",
@@ -659,11 +633,13 @@ def _compute_usage(ctx: SlashContext) -> None:
         for name, count in sorted(tool_counts.items(), key=lambda x: -x[1]):
             lines.append(f"    {name:<18} {count}")
     lines += [
-        f"  compactions      {compaction_str}",
+        f"  checkpoints      {checkpoint_str}",
         f"  est. tokens used {est_total:,}  (in: {est_in:,}, out: {est_out:,})",
         f"  est. tokens today {est_today:,}  (in: {today_chars_in // 4:,}, out: {today_chars_out // 4:,})",
-        f"  active history   ~{est_active:,} tokens  ({active_pct}% of {context_window:,} context window)",
+        f"  active context   ~{est_active:,} tokens  ({active_pct}% of {context_window:,} context window)",
     ]
+    if results:
+        lines.append(f"  tool output      {redacted} of {len(results)} results redacted")
     if age_str:
         lines.append(age_str)
     lines.append("  ────────────────────────────────────────────────")
@@ -771,18 +747,28 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
         return False
 
     if cmd == "/compact":
-        print("  Compacting history...")
-        new_history = await compact_history(
+        print("  Checkpointing history...")
+        result = await force_checkpoint(
             chat_history=ctx.chat_history,
             model=ctx.model,
             session_id=ctx.session_id,
-            trigger="manual",
+            system_prompt=ctx.system_prompt,
+            tools=[],
         )
-        if new_history is ctx.chat_history:
-            print("  Nothing to compact (history too short).")
+        if result is None:
+            # apply_context_policy has already redacted stale tool output in
+            # place, so what remains may be too short to be worth summarising.
+            from quack_norris.core.context import message_tokens
+            tokens = sum(message_tokens(m) for m in ctx.chat_history)
+            print(
+                f"  Nothing to summarise — history is only ~{tokens:,} tokens "
+                f"across {len(ctx.chat_history)} messages."
+            )
         else:
-            ctx.chat_history[:] = new_history
-            print("  done.")
+            print(
+                f"  done — {result.replaced_count} messages summarised, "
+                f"~{result.tokens_before:,} → ~{result.tokens_after:,} tokens."
+            )
         return False
 
     # Try to match as a skill name (/<skill_name>)
@@ -1285,21 +1271,9 @@ async def _print_history(session_id: str) -> None:
     if not events:
         return
 
-    # Find compaction cutoff
-    cutoff_id = -1
-    summary = None
-    for ev in reversed(events):
-        if ev.get("type") == "history_compacted":
-            cutoff_id = ev["data"]["cutoff_id"]
-            summary = ev["data"]["summary"]
-            break
-
     renderer = Renderer(interactive=True)
 
     print("\n" + "─" * 60)
-    if summary:
-        print(f"[Compacted history summary]\n{summary}")
-        print("─" * 60)
 
     # We need to match tool_call_start events to their tool_call_result so we
     # can decide whether to show tool output.  Build a lookup by call_id.
@@ -1310,8 +1284,6 @@ async def _print_history(session_id: str) -> None:
             tool_call_map[call_id] = ev["data"]
 
     for ev in events:
-        if ev["id"] <= cutoff_id:
-            continue
         t = ev.get("type")
         data = ev.get("data", {})
 
@@ -1359,6 +1331,12 @@ async def _print_history(session_id: str) -> None:
         elif t == "system_hint":
             renderer.finish_turn()
             print(f"  [{data.get('text', '')}]")
+
+        elif t == "checkpoint":
+            renderer.finish_turn()
+            print(
+                f"\n  ◆ checkpoint — {data.get('replaces', 0)} messages summarised"
+            )
 
     renderer.finish_turn()
     print("─" * 60)
