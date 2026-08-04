@@ -23,6 +23,7 @@ dev = [
 quack-norris         = "quack_norris.cli.__main__:main"
 quack-norris-ui      = "quack_norris.webui.__main__:main"
 quack-norris-manage  = "quack_norris.manage.__main__:main"
+quack-norris-sandbox = "quack_norris.sandbox:main"
 
 [build-system]
 requires = ["hatchling"]
