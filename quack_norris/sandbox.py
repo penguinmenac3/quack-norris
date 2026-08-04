@@ -66,6 +66,7 @@ _DEVIN_DATA = (
 )
 _AGENT_CONFIG_DIRS = {
     "quack": [(_QUACK_HOME, "/root/.config/quack-norris")],
+    "copilot": [(_HOME / ".copilot", "/root/.copilot")],
     "devin": [
         (_DEVIN_DATA / "credentials.toml", "/root/.local/share/devin/credentials.toml"),
         (_DEVIN_CONFIG / "config.json", "/root/.config/devin/config.json"),
@@ -83,6 +84,7 @@ _AGENT_CONFIG_DIRS = {
 # Default command to launch each agent inside the container / worktree.
 _AGENT_CMD = {
     "quack": "quack-norris --resume",
+    "copilot": "copilot",
     "devin": "devin",
     "claude": "claude",
 }

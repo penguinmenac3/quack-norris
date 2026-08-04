@@ -1,5 +1,5 @@
 # Default sandbox images for `quack-norris-sandbox`, one stage per agent.
-# Built with `--target quack|devin|claude` (see --agent), and only used when
+# Built with `--target quack|copilot|devin|claude` (see --agent), and only used when
 # the worktree has no Dockerfile of its own and no image is configured.
 
 FROM python:3.12-slim AS base
@@ -18,7 +18,10 @@ CMD ["bash"]
 
 FROM base AS quack
 ARG QUACK_NORRIS_REF=main
-RUN uv tool install "https://github.com/penguinmenac3/quack-norris/archive/refs/heads/${QUACK_NORRIS_REF}.tar.gz"
+RUN uv tool install "https://github.com/penguinmenac3/quack-norris/archive/refs/heads/${QUACK_NORRIS_REF}.tar.gz"[bedrock]
+
+FROM base AS copilot
+RUN curl -fsSL https://gh.io/copilot-install | bash
 
 FROM base AS devin
 # The installer ends with an interactive `devin setup` (login), which cannot
