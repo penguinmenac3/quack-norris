@@ -23,7 +23,7 @@ import uuid
 from dataclasses import replace
 from typing import Any
 
-from quack_norris.cli.session import append_event, read_events, session_dir
+from quack_norris.cli.session import append_event, overflow_dir, read_events, session_dir
 from quack_norris.core.context import (
     CheckpointOutput,
     ContextPolicy,
@@ -53,7 +53,7 @@ def make_overflow_sink(session_id: str):
     """Return a sink that spills oversized tool output into the session dir."""
 
     def _sink(content: str) -> str:
-        path = session_dir(session_id) / "overflow" / f"{uuid.uuid4().hex[:8]}.txt"
+        path = overflow_dir(session_id) / f"{uuid.uuid4().hex[:8]}.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8", errors="replace")
         return str(path)

@@ -10,7 +10,9 @@ Requires approval (auto-approved by the CLI if path is within project root):
   file_view       — read a file with line numbers, or list a directory
                     (escalates to user if path resolves outside project root)
 
-Requires approval (write/destructive):
+Requires approval (write/destructive; auto-approved inside the current
+session's ``overflow/`` dir, which holds agent-owned scratch data — the
+tool-output overflow files — when ``make_file_tools`` is given a session_id):
   file_write      — create a new file (fails if already exists)
   file_str_replace — edit a file in-place by exact string replacement
   file_move       — move or rename a file/directory
@@ -161,8 +163,23 @@ def attach_path_normalizer(tools: "list[Tool]", get_root: "Callable[[], Path]") 
 # Factory — builds all file tools bound to a get_cwd callable
 # ---------------------------------------------------------------------------
 
-def make_file_tools(get_cwd: Callable[[], Path]) -> list[Tool]:
-    """Return file tool instances that resolve relative paths against get_cwd()."""
+def make_file_tools(
+    get_cwd: Callable[[], Path],
+    session_id: str | None = None,
+) -> list[Tool]:
+    """Return file tool instances that resolve relative paths against get_cwd().
+
+    When *session_id* is given, file operations confined to that session's
+    overflow directory (``<session>/overflow/``) are auto-approved: it holds
+    agent-owned scratch data (spilled tool output), so the agent may freely
+    read, write and delete there.
+    """
+
+    def _in_overflow_dir(p: Path) -> bool:
+        if session_id is None:
+            return False
+        from quack_norris.cli.session import overflow_dir
+        return not _is_outside(p, overflow_dir(session_id))
 
     # -----------------------------------------------------------------------
     # file_view — read file or list directory (auto-approved within project root)
@@ -170,7 +187,18 @@ def make_file_tools(get_cwd: Callable[[], Path]) -> list[Tool]:
 
     def _file_view_needs_approval(args: dict):
         p = _resolve(args.get("path") or ".", get_cwd())
+        if _in_overflow_dir(p):
+            return False
         return True if _is_outside(p, get_cwd()) else False
+
+    def _needs_approval_outside_overflow(*arg_names: str):
+        """Approval predicate: auto-approve only if every path arg is in the overflow dir."""
+        def _predicate(args: dict):
+            paths = [args.get(name) for name in arg_names]
+            if not all(paths):
+                return True
+            return not all(_in_overflow_dir(_resolve(p, get_cwd())) for p in paths)
+        return _predicate
 
     @tool(needs_approval=_file_view_needs_approval)
     def file_view(
@@ -220,7 +248,7 @@ def make_file_tools(get_cwd: Callable[[], Path]) -> list[Tool]:
     # file_write — create new file (approval required)
     # -----------------------------------------------------------------------
 
-    @tool(needs_approval=True)
+    @tool(needs_approval=_needs_approval_outside_overflow("path"))
     def file_write(
         path: Annotated[str, Param("Relative or absolute path for the new file — use a relative path (e.g. 'foo/bar.py'); absolute paths are only acceptable when the target is outside the project root")],
         content: Annotated[str, Param("Full content to write to the file")],
@@ -254,7 +282,7 @@ def make_file_tools(get_cwd: Callable[[], Path]) -> list[Tool]:
     # file_str_replace — edit in-place (approval required)
     # -----------------------------------------------------------------------
 
-    @tool(needs_approval=True)
+    @tool(needs_approval=_needs_approval_outside_overflow("path"))
     def file_str_replace(
         path: Annotated[str, Param("Relative or absolute path to the file to edit — use a relative path (e.g. 'foo/bar.py'); absolute paths are only acceptable when the target is outside the project root")],
         old_string: Annotated[str, Param("Exact string to find (must be unique in the file)")],
@@ -290,7 +318,7 @@ def make_file_tools(get_cwd: Callable[[], Path]) -> list[Tool]:
     # file_move — move or rename (approval required)
     # -----------------------------------------------------------------------
 
-    @tool(needs_approval=True)
+    @tool(needs_approval=_needs_approval_outside_overflow("source", "destination"))
     def file_move(
         source: Annotated[str, Param("Relative or absolute path to move from — use a relative path (e.g. 'foo/bar.py'); absolute paths are only acceptable when the source is outside the project root")],
         destination: Annotated[str, Param("Relative or absolute path to move to — use a relative path (e.g. 'foo/bar.py'); absolute paths are only acceptable when the destination is outside the project root")],
@@ -312,7 +340,7 @@ def make_file_tools(get_cwd: Callable[[], Path]) -> list[Tool]:
     # file_delete — delete file or empty dir (approval required)
     # -----------------------------------------------------------------------
 
-    @tool(needs_approval=True)
+    @tool(needs_approval=_needs_approval_outside_overflow("path"))
     def file_delete(
         path: Annotated[str, Param("Relative or absolute path to delete — use a relative path (e.g. 'foo/bar.py'); absolute paths are only acceptable when the target is outside the project root")],
     ) -> ToolResult:

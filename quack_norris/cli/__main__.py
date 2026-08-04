@@ -222,6 +222,8 @@ def _log_tool_call_result(
 
 async def _ask_user_interactive(question: str, choices: list[str]) -> str:
     """Print a question from the agent and wait for user input."""
+    from quack_norris.cli.notify import bell
+    bell()
     print(f"\n  [Agent asks] {question}")
     if choices:
         for i, c in enumerate(choices, 1):
@@ -268,7 +270,7 @@ async def _run_turn(
         ask_user_fn=_ask_user_interactive if interactive else _ask_user_auto_deny,
     )
     get_cwd = lambda: Path(meta.cwd) if meta.cwd else Path.cwd()
-    file_tools = make_file_tools(get_cwd)
+    file_tools = make_file_tools(get_cwd, session_id)
     bg_tools = make_background_tools(registry) if registry is not None else []
     all_tools = [make_shell_tool(get_cwd, registry)] + file_tools + make_quack_tools(quack_ctx) + bg_tools
 
@@ -490,6 +492,8 @@ async def _run_interactive(
         finally:
             _agent_task = None
             touch_meta(meta, status="idle")
+            from quack_norris.cli.notify import bell
+            bell()
 
         print()  # blank line before next prompt
 

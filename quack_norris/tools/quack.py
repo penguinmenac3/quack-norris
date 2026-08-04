@@ -157,7 +157,10 @@ def make_quack_tools(ctx: QuackContext) -> list:
             prompt_ref=[sub_prompt],
             ask_user_fn=ctx.ask_user_fn,
         )
-        sub_file_tools = make_file_tools(lambda: Path(ctx.meta.cwd) if ctx.meta.cwd else Path.cwd())
+        sub_file_tools = make_file_tools(
+            lambda: Path(ctx.meta.cwd) if ctx.meta.cwd else Path.cwd(),
+            ctx.session_id,
+        )
         sub_static = [shell] + sub_file_tools
         sub_quack = make_quack_tools(sub_quack_ctx)
         # Exclude agent-management tools from subagent

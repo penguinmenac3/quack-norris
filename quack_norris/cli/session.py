@@ -33,6 +33,11 @@ def session_dir(session_id: str) -> Path:
     return sessions_root() / session_id
 
 
+def overflow_dir(session_id: str) -> Path:
+    """Dir holding this session's tool-output overflow files (agent-owned scratch)."""
+    return session_dir(session_id) / "overflow"
+
+
 def _meta_path(session_id: str) -> Path:
     return session_dir(session_id) / "meta.json"
 

@@ -16,6 +16,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from quack_norris.cli.input import read_single_line
+from quack_norris.cli.notify import bell
 from quack_norris.cli.renderer import _format_args_multiline
 from quack_norris.core.agent import ToolCallOutput
 from quack_norris.core.llm import ToolResult
@@ -57,6 +58,7 @@ async def interactive_approval(
     else:
         print(f"\n  {badge} {call.tool_name}", file=sys.stdout, flush=True)
 
+    bell()
     loop = asyncio.get_running_loop()
     while True:
         try:
