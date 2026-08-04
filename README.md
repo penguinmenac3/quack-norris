@@ -15,7 +15,7 @@ Quack Norris is three things:
 - **Session management** — persistent append-only JSONL event log; resume, list, archive sessions; auto-generated session names
 - **Context management** — three-tier memory: a verbatim window of recent messages, tool-output redaction beyond it, and LLM-summarised checkpoints once the window fills; per-result output caps; manual `/compact`
 - **Agent system** — load `*.agent.md` definitions from global `~/.config/quack-norris/agents/` or project `.agents/`; switch live with `/agent`
-- **Multi-provider LLM** — Ollama, OpenAI, Azure OpenAI, AWS Bedrock, and any OpenAI-compatible endpoint
+- **Multi-provider LLM** — Ollama, OpenAI, Azure OpenAI, AWS Bedrock, GitHub Copilot, and any OpenAI-compatible endpoint
 - **Background processes** — long-running shell commands promoted to background handles (`bg-xxxx`) with `check_tool` / `await_tool` / `kill_tool`
 
 ## Quick start
@@ -85,6 +85,10 @@ llms:
 
 Model strings use `group/model-name` notation — e.g. `"ollama/qwen3:14b"`, `"openai/gpt-4o"`.
 
+### GitHub Copilot authentication
+
+Copilot uses GitHub's device-flow OAuth — no API key required. On first use run `/copilot-login` inside the REPL, or just send a message and the prompt will appear automatically. The token is cached at `~/.config/quack-norris/copilot_token` and reused on every subsequent run.
+
 ## CLI flags
 
 ```bash
@@ -108,6 +112,7 @@ quack-norris [--resume [id]] [--prompt <text>] [--prompt-file <file>]
 | `/model <name>` | Switch LLM live |
 | `/project <dir>` | Change project working directory live |
 | `/compact` | Manually checkpoint the conversation history |
+| `/copilot-login` | Authenticate with GitHub Copilot (device flow) |
 | `/archive` | Archive session and exit |
 | `/help` | List all slash commands |
 | `/exit` / `/quit` | Exit the REPL |
@@ -176,6 +181,24 @@ quack-norris-manage uninstall concise-writer
 ```
 
 Scope flags `--global` / `--local` control whether items are installed to `~/.agents/` (global, shared across projects) or `<cwd>/.agents/` (project-local). Install also accepts IDE flags (`--quack-norris`, `--copilot`, `--claude`, `--windsurf`, `--continue`) to copy agent files into IDE-specific locations.
+
+## Sandbox (`quack-norris-sandbox`)
+
+`quack-norris-sandbox` creates an isolated git worktree for a branch and launches the agent inside a container with that worktree as the working directory, so it can work there without touching your main checkout.
+
+```bash
+# Launch the agent in a container on a new branch
+quack-norris-sandbox my-feature-branch
+
+# Launch without a container (agent runs directly in the worktree on the host)
+quack-norris-sandbox --no-container my-feature-branch
+
+# Open a debug shell instead of starting the agent
+quack-norris-sandbox --shell bash my-feature-branch
+quack-norris-sandbox --no-container --shell bash my-feature-branch
+```
+
+The sandbox mounts your `~/.config/quack-norris/` config into the container so the agent is already authenticated and configured.
 
 ## Core library
 

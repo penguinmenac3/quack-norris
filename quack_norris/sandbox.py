@@ -1,16 +1,15 @@
 """``quack-norris-sandbox`` — run an agent in an isolated worktree container.
 
-Creates a git worktree for a branch, then drops you into an attached shell
-inside a container with that worktree mounted at ``/workspace``, so
-quack-norris (or any other AI agent) can work there without touching the
-main checkout.
+Creates a git worktree for a branch, then launches the agent inside a
+container with that worktree mounted at ``/workspace`` as the working
+directory, so quack-norris (or any other AI agent) can work there without
+touching the main checkout.
 
-With ``--no-container`` it stops after creating the worktree and just prints
-``cd <worktree>`` — handy for lightweight tasks. Since a child process cannot
-change its caller's directory, eval it to actually move there::
+Pass ``--shell <cmd>`` to run an arbitrary command instead of the agent
+(e.g. ``--shell bash`` for a debug shell).
 
-    eval "$(quack-norris-sandbox --no-container my-branch)"   # bash/zsh
-    iex (quack-norris-sandbox --no-container my-branch)        # PowerShell
+With ``--no-container`` the container is skipped and the agent (or
+``--shell`` command) is launched directly in the worktree on the host.
 
 Image resolution, in order: ``--image``, then an explicitly passed ``--agent``
 (the bundled ``sandbox.Dockerfile`` stage for quack-norris, Devin CLI, or
@@ -81,6 +80,13 @@ _AGENT_CONFIG_DIRS = {
     ],
 }
 
+# Default command to launch each agent inside the container / worktree.
+_AGENT_CMD = {
+    "quack": "quack-norris --resume",
+    "devin": "devin",
+    "claude": "claude",
+}
+
 
 def _build(runtime: str, tag: str, dockerfile: Path, context: Path, target: str = "") -> str:
     """Build *dockerfile* as *tag* and return the tag. Exits on failure."""
@@ -148,18 +154,17 @@ def main() -> None:
             sys.exit(add.returncode)
 
     if args.no_container:
-        if not args.shell:
-            # A child process cannot change the caller's directory, so the cd
-            # goes to stdout for the user to run (or to eval), and everything
-            # explaining that to stderr, where it won't pollute an eval.
-            print(f"Worktree ready: {target}", file=sys.stderr)
-            print(f"Your shell is still in {Path.cwd()}; run the line below to move there, "
-                  "or wrap this command in eval \"$(...)\" / iex to do it automatically:",
-                  file=sys.stderr)
-            print(f"cd {target}")
-            return
-        print(f"Worktree: {target}\nRunning:  {args.shell}  (no container)")
-        sys.exit(subprocess.run(args.shell, cwd=target, shell=True).returncode)
+        if args.shell:
+            print(f"Worktree: {target}\nRunning:  {args.shell}  (no container)", file=sys.stderr)
+            sys.exit(subprocess.run(args.shell, cwd=target, shell=True).returncode)
+        # Default: launch the agent in the worktree directory on the host.
+        _cfg = _sandbox_config()
+        _agent = args.agent or _cfg.get("agent") or "quack"
+        if _agent not in _AGENT_CMD:
+            sys.exit(f"Unknown agent '{_agent}'. Choose one of: {', '.join(sorted(_AGENT_CMD))}")
+        cmd_str = _AGENT_CMD[_agent]
+        print(f"Worktree: {target}\nLaunching: {cmd_str}  (no container)", file=sys.stderr)
+        sys.exit(subprocess.run(cmd_str, cwd=target, shell=True).returncode)
 
     cfg = _sandbox_config()
     runtime = _pick_runtime(args.runtime or cfg.get("runtime"))
@@ -212,7 +217,8 @@ def main() -> None:
 
     # Explicit command: don't rely on the image's CMD (python images default to
     # a Python REPL, and a stage's inherited CMD is not always preserved).
-    inner = args.shell or "bash"
+    # Default: launch the agent; --shell overrides with an arbitrary command.
+    inner = args.shell or _AGENT_CMD[agent]
     if seeded:
         # mkdir -p: a seeded file may live in a directory the image doesn't have
         # (e.g. /root/.config/devin).
