@@ -23,7 +23,7 @@ from quack_norris.core.llm.provider import (
     ToolDefinition,
     ToolParameter,
 )
-from quack_norris.core.llm.providers import AzureOpenAIProvider, BedrockProvider, OpenAIProvider
+from quack_norris.core.llm.providers import AzureOpenAIProvider, BedrockProvider, CopilotProvider, OpenAIProvider
 from quack_norris.core.llm.tool import Tool, ToolCallRequest, ToolResult
 
 _DEFAULT_CONFIG_NAME = "config.yaml"
@@ -33,8 +33,8 @@ _log = logging.getLogger(__name__)
 
 
 def _global_config_dir() -> Path:
-    """Return ``~/.quack-norris`` (or ``$QUACK_NORRIS_HOME`` if set)."""
-    return Path(os.environ.get(_HOME_ENV_VAR, str(Path.home() / ".quack-norris")))
+    """Return ``~/.config/quack-norris`` (or ``$QUACK_NORRIS_HOME`` if set)."""
+    return Path(os.environ.get(_HOME_ENV_VAR, str(Path.home() / ".config/quack-norris")))
 
 
 def _load_global_raw() -> dict[str, Any]:
@@ -48,7 +48,7 @@ def _load_global_raw() -> dict[str, Any]:
 
 
 # Type alias for any provider instance
-_AnyProvider = OpenAIProvider | BedrockProvider
+_AnyProvider = OpenAIProvider | BedrockProvider | CopilotProvider
 
 
 def _tool_definition(t: Tool) -> ToolDefinition:
@@ -92,6 +92,11 @@ def _build_provider(cfg: LLMConfig) -> _AnyProvider:
             api_key=cfg.api_key,
             region_name=cfg.region or "us-east-1",
         )
+    if cfg.provider == "GitHubCopilot":
+        # api_endpoint can be omitted (public GitHub) or a GHE base URL
+        # (e.g. https://your-company.ghe.com/); the provider derives
+        # the Copilot API URL and auth domain automatically.
+        return CopilotProvider(api_endpoint=cfg.api_endpoint or None)
     # Default: OpenAI-compatible
     return OpenAIProvider(base_url=cfg.api_endpoint, api_key=cfg.api_key)
 
@@ -126,7 +131,7 @@ class LLM:
         Load provider config, merging a project-local config on top of the
         global one.
 
-        The global config (``~/.quack-norris/config.yaml`` or ``llms.yaml``;
+        The global config (``~/.config/quack-norris/config.yaml`` or ``llms.yaml``;
         override the directory via ``$QUACK_NORRIS_HOME``) is loaded first as
         the base, if present. *path* — or, if omitted, ``config.yaml`` /
         ``llms.yaml`` in the current working directory — is then loaded and

@@ -1,4 +1,4 @@
-"""Git cache — clone/fetch source repos into ~/.quack-norris/cache/."""
+"""Git cache — clone/fetch source repos into ~/.config/quack-norris/cache/."""
 
 from __future__ import annotations
 

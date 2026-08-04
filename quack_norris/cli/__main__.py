@@ -685,6 +685,7 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
             "  /compact           Compact history\n"
             "  /usage             Show session token and request stats\n"
             "  /archive           Exit and archive this session\n"
+            "  /copilot-login     Authenticate with GitHub Copilot (device flow)\n"
             "  /help              Show this help\n"
             "  /exit  /quit       Exit"
         )
@@ -773,6 +774,25 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
                 f"  done — {result.replaced_count} messages summarised, "
                 f"~{result.tokens_before:,} → ~{result.tokens_after:,} tokens."
             )
+        return False
+
+    if cmd == "/copilot-login":
+        from quack_norris.core.llm.providers.copilot import _parse_endpoint, get_copilot_token
+        configs = LLM.configs()
+        copilot_cfgs = [c for c in configs if c.provider == "GitHubCopilot"]
+        if not copilot_cfgs:
+            print("  No GitHubCopilot provider configured.")
+            return False
+        for cfg in copilot_cfgs:
+            _base_url, enterprise_domain = _parse_endpoint(cfg.api_endpoint or None)
+            domain_label = enterprise_domain or "github.com"
+            print(f"  Authenticating with {domain_label} ...")
+            try:
+                get_copilot_token(enterprise_domain)
+                print(f"  ✓ Logged in to {domain_label} (token cached)")
+            except Exception as e:  # noqa: BLE001
+                print(f"  ✗ Login failed: {e}")
+        _list_models(meta.model)
         return False
 
     # Try to match as a skill name (/<skill_name>)
@@ -921,7 +941,7 @@ def _load_system_prompt(agent_name: str | None, project_root: Path | None = None
 
 def _setup_llm(config_path: str | None) -> None:
     """Load LLM config. ``LLM.setup()`` merges the project-local config (cwd,
-    or *config_path* if given) on top of the global ``~/.quack-norris/`` one.
+    or *config_path* if given) on top of the global ``~/.config/quack-norris/`` one.
     """
     try:
         LLM.setup(config_path)
@@ -929,7 +949,7 @@ def _setup_llm(config_path: str | None) -> None:
         print(f"Error: {e}", file=sys.stderr)
         print(
             "Create config.yaml or llms.yaml in the current directory or in "
-            "~/.quack-norris/, or pass --config <path>.",
+            "~/.config/quack-norris/, or pass --config <path>.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1070,7 +1090,25 @@ def _list_models(current: str | None) -> None:
         return
     print("  Available models:")
     for cfg in configs:
-        if cfg.models:
+        if cfg.provider == "GitHubCopilot":
+            marker = "*" if current and current.startswith(cfg.group + "/") else " "
+            if cfg.models:
+                # Static list configured — just show it
+                for m in cfg.models:
+                    marker = "*" if f"{cfg.group}/{m}" == current else " "
+                    print(f"   {marker} {cfg.group}/{m}")
+            elif _copilot_token_exists(cfg):
+                # Token cached — fetch live model list using the Copilot token
+                models = _fetch_copilot_models_sync(cfg)
+                if models:
+                    for m in models:
+                        marker = "*" if f"{cfg.group}/{m}" == current else " "
+                        print(f"   {marker} {cfg.group}/{m}")
+                else:
+                    print(f"   {marker} {cfg.group}/<model>  (could not fetch model list)")
+            else:
+                print(f"   {marker} {cfg.group}/<model>  (use /copilot-login to authenticate)")
+        elif cfg.models:
             for m in cfg.models:
                 marker = "*" if f"{cfg.group}/{m}" == current else " "
                 print(f"   {marker} {cfg.group}/{m}")
@@ -1088,6 +1126,32 @@ def _list_models(current: str | None) -> None:
             marker = "*" if current and current.startswith(cfg.group + "/") else " "
             print(f"   {marker} {cfg.group}/<model>  (Bedrock — no static list)")
     print("  Usage: /model <group>/<model>")
+
+
+def _copilot_token_exists(cfg: "LLMConfig") -> bool:
+    """Return True if a cached Copilot token exists for this config."""
+    from quack_norris.core.llm.providers.copilot import _parse_endpoint, _load_token
+    _base_url, enterprise_domain = _parse_endpoint(cfg.api_endpoint or None)
+    return _load_token(enterprise_domain) is not None
+
+
+def _fetch_copilot_models_sync(cfg: "LLMConfig") -> list[str]:
+    """Fetch model names from the Copilot /models endpoint using the cached token."""
+    from quack_norris.core.llm.providers.copilot import _parse_endpoint, _load_token, _headers, _API_VER
+    import urllib.request, json as _json
+    base_url, enterprise_domain = _parse_endpoint(cfg.api_endpoint or None)
+    token = _load_token(enterprise_domain)
+    if not token:
+        return []
+    try:
+        req = urllib.request.Request(f"{base_url}/models")
+        for k, v in _headers(token).items():
+            req.add_header(k, v)
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = _json.loads(resp.read().decode())
+        return sorted(m["id"] for m in data.get("data", []) if "id" in m)
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _fetch_models_sync(api_endpoint: str, api_key: str | None) -> list[str]:

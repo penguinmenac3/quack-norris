@@ -163,7 +163,7 @@ async def _pattern_picker(call: ToolCallOutput, whitelist: Whitelist, loop: asyn
     print("  Scope:", file=sys.stdout)
     print("    [s] This session only", file=sys.stdout)
     print("    [p] This project  (.quack-whitelist.yaml)", file=sys.stdout)
-    print("    [g] Global        (~/.quack-norris/whitelist.yaml)", file=sys.stdout)
+    print("    [g] Global        (~/.config/quack-norris/whitelist.yaml)", file=sys.stdout)
 
     scope: str | None = None
     while scope is None:

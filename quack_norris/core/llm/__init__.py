@@ -4,8 +4,8 @@ quack_norris.core.llm
 
 Public surface::
 
-    LLM.setup()              # merge ~/.quack-norris/config.yaml with cwd's config.yaml/llms.yaml
-    LLM.setup(path)          # merge ~/.quack-norris/config.yaml with a specific local file
+    LLM.setup()              # merge ~/.config/quack-norris/config.yaml with cwd's config.yaml/llms.yaml
+    LLM.setup(path)          # merge ~/.config/quack-norris/config.yaml with a specific local file
     LLM.converse(model, ...) # stream a turn
 
 Model strings use the ``group/model-name`` convention — identical to

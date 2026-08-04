@@ -14,7 +14,7 @@ Quack Norris is three things:
 - **Approval system** — three-state approval (`auto` / `whitelist→human` / `always human`); per-call dynamic decisions; glob whitelist at session, project, and global scope
 - **Session management** — persistent append-only JSONL event log; resume, list, archive sessions; auto-generated session names
 - **Context management** — three-tier memory: a verbatim window of recent messages, tool-output redaction beyond it, and LLM-summarised checkpoints once the window fills; per-result output caps; manual `/compact`
-- **Agent system** — load `*.agent.md` definitions from global `~/.quack-norris/agents/` or project `.agents/`; switch live with `/agent`
+- **Agent system** — load `*.agent.md` definitions from global `~/.config/quack-norris/agents/` or project `.agents/`; switch live with `/agent`
 - **Multi-provider LLM** — Ollama, OpenAI, Azure OpenAI, AWS Bedrock, and any OpenAI-compatible endpoint
 - **Background processes** — long-running shell commands promoted to background handles (`bg-xxxx`) with `check_tool` / `await_tool` / `kill_tool`
 
@@ -28,7 +28,7 @@ uv add quack-norris                 # add to a project (use as library)
 pip install quack-norris            # plain pip
 ```
 
-Copy `llms.example.yaml` to `~/.quack-norris/config.yaml` (global) and fill in your providers. You can also place a `llms.yaml` in any project directory — it will be merged on top of the global config, so you only need to specify what differs (e.g. just `defaults.model` or a different `llms:` block). Then:
+Copy `llms.example.yaml` to `~/.config/quack-norris/config.yaml` (global) and fill in your providers. You can also place a `llms.yaml` in any project directory — it will be merged on top of the global config, so you only need to specify what differs (e.g. just `defaults.model` or a different `llms:` block). Then:
 
 ```bash
 quack-norris        # interactive REPL (new session in cwd)
@@ -38,7 +38,7 @@ quack-norris --prompt "Summarise the auth module"   # non-interactive
 
 ## LLM config
 
-Config is loaded from `~/.quack-norris/config.yaml` (global) with a project-local `llms.yaml` merged on top. `defaults` and `context_management` are merged key-by-key; `llms:` is fully replaced if the local file defines it.
+Config is loaded from `~/.config/quack-norris/config.yaml` (global) with a project-local `llms.yaml` merged on top. `defaults` and `context_management` are merged key-by-key; `llms:` is fully replaced if the local file defines it.
 
 ```yaml
 defaults:
@@ -126,11 +126,11 @@ file_str_replace:
   - pattern: "tests/**"
 ```
 
-Patterns use glob syntax (`*` = any chars except `/`, `**` = any chars). Three scopes: session (in-memory), project (`.quack-whitelist.yaml`), global (`~/.quack-norris/whitelist.yaml`).
+Patterns use glob syntax (`*` = any chars except `/`, `**` = any chars). Three scopes: session (in-memory), project (`.quack-whitelist.yaml`), global (`~/.config/quack-norris/whitelist.yaml`).
 
 ## Agent definitions
 
-Create `*.agent.md` files in `~/.quack-norris/agents/` (global) or `<project>/.agents/` (project-scoped):
+Create `*.agent.md` files in `~/.config/quack-norris/agents/` (global) or `<project>/.agents/` (project-scoped):
 
 ```markdown
 ---

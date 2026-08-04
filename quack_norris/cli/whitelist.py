@@ -14,7 +14,7 @@ File format (version: 1):
 Load order (first match wins, checked in order):
   1. In-memory session rules (added via "allow pattern" during a session)
   2. Project whitelist  — <project-root>/.quack-whitelist.yaml
-  3. Global whitelist   — ~/.quack-norris/whitelist.yaml
+  3. Global whitelist   — ~/.config/quack-norris/whitelist.yaml
 
 Pattern syntax:
   *   matches any characters except /

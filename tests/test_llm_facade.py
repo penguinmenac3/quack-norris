@@ -12,7 +12,7 @@ from quack_norris.core.llm import LLM
 
 @pytest.fixture(autouse=True)
 def _reset_llm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure LLM state is clean and isolated from the real ~/.quack-norris/ config."""
+    """Ensure LLM state is clean and isolated from the real ~/.config/quack-norris/ config."""
     monkeypatch.setenv("QUACK_NORRIS_HOME", str(tmp_path / "home"))
     LLM._groups = {}
     LLM._model_map = {}
@@ -116,7 +116,7 @@ def test_get_context_window(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Global (~/.quack-norris/) + local config merging
+# Global (~/.config/quack-norris/) + local config merging
 # ---------------------------------------------------------------------------
 
 def _write_global(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, content: str) -> Path:

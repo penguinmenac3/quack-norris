@@ -1,7 +1,7 @@
 """Session directory management.
 
 Handles:
-- Locating the sessions root (~/.quack-norris/sessions/)
+- Locating the sessions root (~/.config/quack-norris/sessions/)
 - Creating new sessions
 - Reading/writing meta.json
 - Appending events to session.jsonl
@@ -23,7 +23,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 def sessions_root() -> Path:
-    base = Path(os.environ.get("QUACK_NORRIS_HOME", Path.home() / ".quack-norris"))
+    base = Path(os.environ.get("QUACK_NORRIS_HOME", Path.home() / ".config" / "quack-norris"))
     root = base / "sessions"
     root.mkdir(parents=True, exist_ok=True)
     return root

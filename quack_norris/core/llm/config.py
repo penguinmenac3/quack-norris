@@ -6,7 +6,7 @@ etc.); only the ``llms:``, ``defaults:``, and ``context_management:`` keys are
 consumed here.
 
 :class:`~quack_norris.core.llm.llm.LLM`'s ``setup()`` merges a global config
-(``~/.quack-norris/config.yaml`` or ``llms.yaml``) with a project-local one
+(``~/.config/quack-norris/config.yaml`` or ``llms.yaml``) with a project-local one
 layered on top (see :func:`merge_raw_configs`) — the local file doesn't need
 to be complete; it only needs to override what differs from global.
 

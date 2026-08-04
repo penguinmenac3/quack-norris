@@ -1,5 +1,5 @@
 # This file can live in the project directory (project-local overrides) and/or
-# in ~/.quack-norris/config.yaml (global defaults). The local file is merged on
+# in ~/.config/quack-norris/config.yaml (global defaults). The local file is merged on
 # top of the global one, so it doesn't need to repeat everything — e.g. a
 # project-local file could set just `defaults.model` or one `llms:` group.
 
@@ -49,3 +49,14 @@ llms:
     api_version: "2024-02-01"
     models:
       - gpt-4o
+
+  # GitHub Copilot — public github.com (device-flow login on first use;
+  # token cached in ~/.config/quack-norris/copilot_token).
+  - group: copilot
+    provider: GitHubCopilot
+
+  # GitHub Enterprise Copilot — supply the GHE base URL; the Copilot API URL
+  # and auth domain are derived automatically.
+  # - group: copilot
+  #   provider: GitHubCopilot
+  #   api_endpoint: https://your-company.ghe.com/

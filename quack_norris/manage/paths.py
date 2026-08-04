@@ -16,11 +16,11 @@ _PROJECT_MARKERS = {
 }
 
 _GLOBAL_AGENTS_DIR = Path.home() / ".agents"
-_QUACK_NORRIS_DIR = Path.home() / ".quack-norris"
+_QUACK_NORRIS_DIR = Path.home() / ".config/quack-norris"
 
 
 def quack_norris_dir() -> Path:
-    """Return ~/.quack-norris, creating it if needed."""
+    """Return ~/.config/quack-norris, creating it if needed."""
     _QUACK_NORRIS_DIR.mkdir(parents=True, exist_ok=True)
     return _QUACK_NORRIS_DIR
 
