@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -121,9 +122,50 @@ def list_sessions(*, include_archived: bool = False) -> list[SessionMeta]:
 # ---------------------------------------------------------------------------
 # Session creation / resume
 # ---------------------------------------------------------------------------
+_ADJECTIVES = [
+    "amber", "ancient", "arctic", "autumn", "azure", "blazing", "blissful", "bold", "brave",
+    "breezy", "bright", "brisk", "bronze", "calm", "canny", "cedar", "celestial", "cerulean",
+    "champion", "charming", "chill", "clever", "cobalt", "cool", "cosmic", "crisp", "crimson",
+    "crystal", "daring", "dawn", "dazzling", "deep", "divine", "dusk", "eager", "earthy",
+    "electric", "emerald", "epic", "eternal", "fearless", "fierce", "fleet", "floating", "floral",
+    "fluent", "frosty", "gentle", "gilded", "glacial", "gleaming", "glowing", "golden", "grand",
+    "granite", "happy", "hardy", "hollow", "humble", "icy", "infinite", "iron", "jade", "jolly",
+    "jubilant", "jagged", "keen", "kindred", "kinetic", "lavender", "lively", "loud", "lucky",
+    "lunar", "luminous", "majestic", "marble", "mellow", "mighty", "misty", "mossy", "mystical",
+    "noble", "northern", "nimble", "nocturnal", "narrow", "onyx", "orange", "obsidian", "patient",
+    "peaceful", "phantom", "polar", "proud", "primal", "pewter", "quick", "quiet", "quartz",
+    "radiant", "rapid", "red", "regal", "royal", "rustic", "rugged", "roaming","sacred", "sapphire",
+    "serene", "sharp", "silent", "silver", "sleek", "smoky", "solar", "sonic", "speedy", "spirited",
+    "stellar", "still", "stormy", "sunny", "swift", "stoic", "sage", "teal", "tidy", "tiny",
+    "tranquil", "true", "twilight", "timeless", "towering", "velvet", "vibrant", "violet", "vivid",
+    "warm", "wild", "windy", "wise", "witty", "wooden", "wandering", "weathered", "woven", "zesty",
+    "zenith",
+]
+
+_NOUNS = [
+    "albatross", "ant", "antler", "aspen", "aurora", "badger", "bear", "bird", "bison", "blaze",
+    "boulder", "brook", "buck", "buzzard", "canyon", "cardinal", "cave", "cedar", "cliff", "cloud",
+    "cobra", "comet", "condor", "coral", "crane", "creek", "crow", "crystal", "dagger", "dawn",
+    "deer", "delta", "dove", "dragon", "drift", "dune", "eagle", "echo", "elm", "ember", "expanse",
+    "falcon", "fern", "finch", "fjord", "flame", "flash", "flint", "fog", "forest", "fox", "frost",
+    "gale", "geode", "glacier", "goshawk", "grove", "gust", "gorge", "hawk", "heron", "hill",
+    "horizon", "haze", "ibis", "isle", "jaguar", "juniper", "kestrel", "knoll", "lake", "lark",
+    "leaf", "ledge", "lightning", "lion", "lynx", "maple", "marsh", "meadow", "mesa", "meteor",
+    "moon", "moose", "moss", "mountain", "nebula", "nighthawk", "nomad", "narwhal", "oak", "ocean",
+    "osprey", "otter", "owl", "peak", "pine", "puma", "pebble", "prairie", "prism", "quail",
+    "quarry", "quartz", "raven", "reef", "ridge", "river", "robin", "rock", "sage", "salmon",
+    "seal", "shore", "sierra", "sky", "slate", "snow", "sparrow", "spruce", "storm", "stream",
+    "summit", "swift", "sandstone", "talon", "thorn", "thunder", "tiger", "timber", "torrent",
+    "trail", "tundra", "thicket", "tide", "vale", "valley", "vine", "vapor", "vortex", "wave",
+    "wildfire", "willow", "wolf", "wren", "waterfall", "woodland", "yak", "zenith", "zephyr",
+]
+
 
 def new_session_id() -> str:
-    return str(uuid.uuid4())
+    adj = random.choice(_ADJECTIVES)
+    noun = random.choice(_NOUNS)
+    suffix = uuid.uuid4().hex[:4]
+    return f"{adj}-{noun}-{suffix}"
 
 
 def create_session(meta: SessionMeta) -> None:
