@@ -123,10 +123,60 @@ def _repo_root() -> Path:
     return Path(out.stdout.strip())
 
 
+def _list_worktrees(repo: Path) -> list[tuple[str, Path]]:
+    """Return [(branch_name, worktree_path), ...] for every non-main worktree."""
+    out = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"], capture_output=True, text=True, cwd=repo
+    )
+    if out.returncode != 0:
+        sys.exit("Could not list worktrees.")
+    entries: list[tuple[str, Path]] = []
+    wt_path: Path | None = None
+    branch: str | None = None
+    for line in out.stdout.splitlines():
+        if line.startswith("worktree "):
+            wt_path = Path(line.split(" ", 1)[1])
+            branch = None
+        elif line.startswith("branch "):
+            branch = line.split("refs/heads/", 1)[-1]
+        elif line == "":
+            if wt_path and branch and wt_path.resolve() != repo.resolve():
+                entries.append((branch, wt_path))
+            wt_path = None
+            branch = None
+    # flush last stanza (no trailing blank line in some git versions)
+    if wt_path and branch and wt_path.resolve() != repo.resolve():
+        entries.append((branch, wt_path))
+    return entries
+
+
+def _pick_worktree(repo: Path) -> tuple[str, Path]:
+    """Interactively pick a worktree; returns (branch, path)."""
+    worktrees = _list_worktrees(repo)
+    if not worktrees:
+        sys.exit("No existing worktrees found (other than the main checkout).")
+    print("Select a worktree to resume:", file=sys.stderr)
+    for i, (branch, wt_path) in enumerate(worktrees, 1):
+        print(f"  {i}) {branch}  ({wt_path})", file=sys.stderr)
+    print(file=sys.stderr)
+    try:
+        raw = input(f"Enter number [1-{len(worktrees)}]: ").strip()
+        idx = int(raw) - 1
+        if not (0 <= idx < len(worktrees)):
+            raise ValueError
+    except (ValueError, EOFError):
+        sys.exit("Invalid selection.")
+    return worktrees[idx]
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="quack-norris-sandbox", description=__doc__)
-    p.add_argument("branch", help="Branch to work on (created from HEAD if missing)")
+    p.add_argument("branch", nargs="?", help="Branch to work on (created from HEAD if missing); "
+                   "omit when using --resume")
     p.add_argument("path", nargs="?", help="Worktree location (default: ../<repo>-<branch>)")
+    p.add_argument("--resume", action="store_true",
+                   help="Interactively pick an existing worktree to resume instead of "
+                        "creating a new one")
     p.add_argument("--image", help="Container image (overrides the worktree's Dockerfile)")
     p.add_argument("--agent", choices=sorted(_AGENT_CONFIG_DIRS),
                    help="Agent whose bundled image to use, overriding the worktree's "
@@ -147,11 +197,23 @@ def main() -> None:
     args = p.parse_args()
 
     repo = _repo_root()
-    safe = args.branch.replace("/", "-")
-    target = Path(args.path).resolve() if args.path else repo.parent / f"{repo.name}-{safe}"
+
+    if args.resume:
+        branch, target = _pick_worktree(repo)
+        if args.path:
+            target = Path(args.path).resolve()
+        if args.branch:
+            branch = args.branch
+        safe = branch.replace("/", "-")
+    else:
+        if not args.branch:
+            p.error("the following arguments are required: branch (or use --resume)")
+        branch = args.branch
+        safe = branch.replace("/", "-")
+        target = Path(args.path).resolve() if args.path else repo.parent / f"{repo.name}-{safe}"
 
     if not target.exists():
-        add = subprocess.run(["git", "worktree", "add", "-B", args.branch, str(target)], cwd=repo)
+        add = subprocess.run(["git", "worktree", "add", "-B", branch, str(target)], cwd=repo)
         if add.returncode != 0:
             sys.exit(add.returncode)
 
