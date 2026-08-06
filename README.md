@@ -227,7 +227,7 @@ final_text = await agent(
 ## Development
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra bedrock
 uv run python -m pytest           # all tests (excludes live tests)
 uv run python -m pytest -m live   # requires a running Ollama instance
 uv run ruff check quack_norris/
