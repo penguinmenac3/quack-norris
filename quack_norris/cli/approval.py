@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from quack_norris.cli.input import read_single_line
 from quack_norris.cli.notify import bell
-from quack_norris.cli.renderer import _format_args_multiline
+from quack_norris.cli.renderer import _format_args_multiline, _gray
 from quack_norris.core.agent import ToolCallOutput
 from quack_norris.core.llm import ToolResult
 
@@ -45,9 +45,9 @@ async def interactive_approval(
     if whitelist is not None and whitelist.is_whitelisted(call.tool_name, call.arguments or {}):
         args = _format_args_multiline(call.arguments or {}, truncate=True)
         if args:
-            print(f"\n  ⚡ {call.tool_name}\n{args}", file=sys.stdout, flush=True)
+            print(_gray(f"\n  ⚡ {call.tool_name}\n{args}"), file=sys.stdout, flush=True)
         else:
-            print(f"\n  ⚡ {call.tool_name}", file=sys.stdout, flush=True)
+            print(_gray(f"\n  ⚡ {call.tool_name}"), file=sys.stdout, flush=True)
         return True
 
     # Needs real approval — print full multi-line block, no truncation.
@@ -67,20 +67,20 @@ async def interactive_approval(
                 lambda: read_single_line("  Allow once (Y), allow pattern (p) or deny (d/n)? (Y/p/d) > "),
             )
         except (EOFError, KeyboardInterrupt):
-            print("\n  ❌ denied", file=sys.stdout)
+            print(_gray("\n  ❌ denied"), file=sys.stdout)
             return _make_denial(None)
 
         answer = answer.strip().lower()
 
         if answer in ("y", "yes", ""):
-            print("  ✅ approved", file=sys.stdout)
+            print(_gray("  ✅ approved"), file=sys.stdout)
             return True
 
         if answer == "p" and whitelist is not None:
             return await _pattern_picker(call, whitelist, loop)
 
         if answer == "p" and whitelist is None:
-            print("  ✅ approved", file=sys.stdout)
+            print(_gray("  ✅ approved"), file=sys.stdout)
             return True
 
         if answer in ("d", "n", "no", "deny"):
@@ -94,10 +94,10 @@ def _make_denial(reason: str | None) -> "ToolResult":
     """Build a denial ToolResult, optionally embedding the user's reason."""
     if reason:
         msg = f"Tool call was denied by the user. Reason: {reason}"
-        print(f"  ❌ denied — {reason}", file=sys.stdout)
+        print(_gray(f"  ❌ denied — {reason}"), file=sys.stdout)
     else:
         msg = "Tool call was denied by the user."
-        print("  ❌ denied", file=sys.stdout)
+        print(_gray("  ❌ denied"), file=sys.stdout)
     return ToolResult(content=msg, is_error=True)
 
 
@@ -117,9 +117,9 @@ def auto_deny(call: ToolCallOutput) -> bool:
     """Always deny — used in non-interactive mode."""
     args = _format_args_multiline(call.arguments or {}, truncate=True)
     if args:
-        print(f"  ❌ auto-denied: {call.tool_name}\n{args}", file=sys.stderr, flush=True)
+        print(_gray(f"  ❌ auto-denied: {call.tool_name}\n{args}"), file=sys.stderr, flush=True)
     else:
-        print(f"  ❌ auto-denied: {call.tool_name}", file=sys.stderr, flush=True)
+        print(_gray(f"  ❌ auto-denied: {call.tool_name}"), file=sys.stderr, flush=True)
     return False
 
 
@@ -135,42 +135,42 @@ async def _pattern_picker(call: ToolCallOutput, whitelist: Whitelist, loop: asyn
     """Show pattern suggestions, let user pick scope, save rule, then approve."""
     suggestions = whitelist.suggest_patterns(call.tool_name, call.arguments or {})
 
-    print("  Select a pattern to whitelist:", file=sys.stdout)
+    print(_gray("  Select a pattern to whitelist:"), file=sys.stdout)
     for i, s in enumerate(suggestions):
-        print(f"    [{i + 1}] {s}", file=sys.stdout)
-    print(f"    [c] Custom pattern", file=sys.stdout)
+        print(_gray(f"    [{i + 1}] {s}"), file=sys.stdout)
+    print(_gray(f"    [c] Custom pattern"), file=sys.stdout)
 
     pattern: str | None = None
     while pattern is None:
         try:
             choice = await loop.run_in_executor(None, lambda: read_single_line("  Pattern (1/2/.../c) > "))
         except (EOFError, KeyboardInterrupt):
-            print("\n  ❌ denied", file=sys.stdout)
+            print(_gray("\n  ❌ denied"), file=sys.stdout)
             return False
         choice = choice.strip()
         if choice.lower() == "c":
             try:
                 custom = await loop.run_in_executor(None, lambda: read_single_line("  Custom pattern > "))
             except (EOFError, KeyboardInterrupt):
-                print("\n  ❌ denied", file=sys.stdout)
+                print(_gray("\n  ❌ denied"), file=sys.stdout)
                 return False
             pattern = custom.strip() or None
         elif choice.isdigit() and 1 <= int(choice) <= len(suggestions):
             pattern = suggestions[int(choice) - 1]
         else:
-            print(f"  Enter a number between 1 and {len(suggestions)}, or c for custom.", file=sys.stdout)
+            print(_gray(f"  Enter a number between 1 and {len(suggestions)}, or c for custom."), file=sys.stdout)
 
-    print("  Scope:", file=sys.stdout)
-    print("    [s] This session only", file=sys.stdout)
-    print("    [p] This project  (.quack-whitelist.yaml)", file=sys.stdout)
-    print("    [g] Global        (~/.config/quack-norris/whitelist.yaml)", file=sys.stdout)
+    print(_gray("  Scope:"), file=sys.stdout)
+    print(_gray("    [s] This session only"), file=sys.stdout)
+    print(_gray("    [p] This project  (.quack-whitelist.yaml)"), file=sys.stdout)
+    print(_gray("    [g] Global        (~/.config/quack-norris/whitelist.yaml)"), file=sys.stdout)
 
     scope: str | None = None
     while scope is None:
         try:
             s = await loop.run_in_executor(None, lambda: read_single_line("  Scope (s/p/g) > "))
         except (EOFError, KeyboardInterrupt):
-            print("\n  ❌ denied", file=sys.stdout)
+            print(_gray("\n  ❌ denied"), file=sys.stdout)
             return False
         s = s.strip().lower()
         if s in ("s", "session"):
@@ -183,9 +183,9 @@ async def _pattern_picker(call: ToolCallOutput, whitelist: Whitelist, loop: asyn
             whitelist.add_global_rule(call.tool_name, pattern)
             scope = "global"
         else:
-            print("  Enter s (session), p (project), or g (global).", file=sys.stdout)
+            print(_gray("  Enter s (session), p (project), or g (global)."), file=sys.stdout)
 
-    print(f"  ✅ approved + ⚡ whitelisted: '{pattern}' @ {scope}", file=sys.stdout)
+    print(_gray(f"  ✅ approved + ⚡ whitelisted: '{pattern}' @ {scope}"), file=sys.stdout)
     return True
 
 

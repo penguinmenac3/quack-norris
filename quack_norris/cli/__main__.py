@@ -824,21 +824,36 @@ async def _handle_slash(text: str, ctx: SlashContext) -> str | bool | tuple[bool
 
 def _session_menu(initial_meta: SessionMeta) -> tuple[str, SessionMeta]:
     """Show session selection menu. Returns (session_id, meta)."""
+    from datetime import datetime, timezone
     sessions = list_sessions()
-    print("\nQuackNorris\n")
-    print("  [0] New session")
-    for i, s in enumerate(sessions, 1):
-        status = s.status.ljust(7)
-        from datetime import datetime, timezone
-        try:
-            last = datetime.fromisoformat(s.last_active.replace("Z", "+00:00"))
-            age = _human_age(last)
-        except Exception:  # noqa: BLE001
-            age = "?"
-        name = s.name or s.id[:8] + "..."
-        print(f"  [{i}] {name:<30} ({status}, {age})")
+    cwd = str(Path.cwd())
+    local   = [s for s in sessions if s.cwd == cwd]
+    global_ = [s for s in sessions if s.cwd != cwd]
 
-    print()
+    print("\nQuackNorris\n")
+    print("  [0] New session\n")
+
+    ordered: list[SessionMeta] = []
+
+    def _print_section(label: str, items: list[SessionMeta]) -> None:
+        if not items:
+            return
+        print(f"  ── {label} {'─' * max(0, 48 - len(label))}")
+        for s in items:
+            status = s.status.ljust(7)
+            try:
+                last = datetime.fromisoformat(s.last_active.replace("Z", "+00:00"))
+                age = _human_age(last)
+            except Exception:  # noqa: BLE001
+                age = "?"
+            name = s.name or s.id[:8] + "..."
+            print(f"  [{len(ordered) + 1}] {name:<30} ({status}, {age})")
+            ordered.append(s)
+        print()
+
+    _print_section("Local (this project)", local)
+    _print_section("Global", global_)
+
     while True:
         try:
             choice = input("Select: ").strip()
@@ -853,9 +868,8 @@ def _session_menu(initial_meta: SessionMeta) -> tuple[str, SessionMeta]:
 
         try:
             idx = int(choice) - 1
-            if 0 <= idx < len(sessions):
-                s = sessions[idx]
-                return s.id, s
+            if 0 <= idx < len(ordered):
+                return ordered[idx].id, ordered[idx]
         except ValueError:
             pass
         print("  Invalid selection.")
@@ -960,6 +974,13 @@ def _setup_llm(config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    # Reconfigure stdout/stderr to UTF-8 so Unicode box-drawing and emoji
+    # render correctly on Windows (cp1252 by default there).
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     args = _parse_args()
     _setup_llm(getattr(args, "config", None))
 

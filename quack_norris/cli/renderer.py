@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 
+from quack_norris.cli.md_stream_renderer import MdStreamRenderer
 from quack_norris.core.agent import (
     AgentOutput,
     CheckpointOutput,
@@ -17,6 +18,14 @@ from quack_norris.core.agent import (
     ToolCallOutput,
     ToolResultOutput,
 )
+
+# ANSI dim-grey for system/tool noise — keeps LLM text visually dominant.
+_GRAY  = "\033[2m"   # dim (supported everywhere; renders grey on most terminals)
+_RESET = "\033[0m"
+
+
+def _gray(text: str) -> str:
+    return f"{_GRAY}{text}{_RESET}"
 
 
 class Renderer:
@@ -38,6 +47,7 @@ class Renderer:
         self._in_thinking = False
         self._in_text = False
         self._after_tool = False  # True after a tool call/result, so we newline before next text
+        self._md = MdStreamRenderer(sys.stdout)  # stream markdown renderer for assistant text
 
     # ------------------------------------------------------------------
     # Public
@@ -58,9 +68,11 @@ class Renderer:
     def finish_turn(self) -> None:
         """Call after agent turn completes to ensure trailing newline."""
         if self._in_text or self._in_thinking:
+            self._md.finish()
             print(file=self._text_stream())
             self._in_text = False
             self._in_thinking = False
+            self._md.reset()
         self._after_tool = False
 
     # ------------------------------------------------------------------
@@ -77,27 +89,29 @@ class Renderer:
         if not self._show_thinking:
             return
         if not self._in_thinking:
-            print("<think>", file=self._text_stream(), flush=True)
+            print(_gray("<think>"), file=self._text_stream(), flush=True)
             self._in_thinking = True
-        print(item.text, end="", file=self._text_stream(), flush=True)
+        print(_gray(item.text), end="", file=self._text_stream(), flush=True)
 
     def _handle_text(self, item: TextOutput) -> None:
         if self._in_thinking:
-            print("\n</think>", file=self._text_stream())
+            print(_gray("\n</think>"), file=self._text_stream())
             self._in_thinking = False
         if self._after_tool:
             print(file=self._text_stream())  # blank line after tool block before response
             self._after_tool = False
         self._in_text = True
-        print(item.text, end="", file=self._text_stream(), flush=True)
+        self._md.feed(item.text)
 
     def _handle_checkpoint(self, item: CheckpointOutput) -> None:
         if self._in_text:
             print(file=self._text_stream())
             self._in_text = False
         print(
-            f"\n  ◆ checkpoint — {item.replaced_count} messages summarised, "
-            f"~{item.tokens_before:,} → ~{item.tokens_after:,} tokens",
+            _gray(
+                f"\n  ◆ checkpoint — {item.replaced_count} messages summarised, "
+                f"~{item.tokens_before:,} → ~{item.tokens_after:,} tokens"
+            ),
             file=self._status_stream(),
             flush=True,
         )
@@ -108,12 +122,12 @@ class Renderer:
             print(file=self._text_stream())
             self._in_text = False
         if item.needs_approval is False:
-            # Auto-approved — print compact multi-line block now.
+            # Auto-approved — print compact multi-line block now, greyed out.
             args = _format_args_multiline(item.arguments, truncate=True)
             if args:
-                print(f"\n  ⚡ {item.tool_name}\n{args}", file=self._status_stream(), flush=True)
+                print(_gray(f"\n  ⚡ {item.tool_name}\n{args}"), file=self._status_stream(), flush=True)
             else:
-                print(f"\n  ⚡ {item.tool_name}", file=self._status_stream(), flush=True)
+                print(_gray(f"\n  ⚡ {item.tool_name}"), file=self._status_stream(), flush=True)
             self._after_tool = True
         # For needs_approval=True/"human", approval.py prints the badge + args.
 
@@ -126,13 +140,13 @@ class Renderer:
                 first = f"  ❌ {lines[0]}" if lines else "  ❌"
                 rest = "\n".join(f"     {line}" for line in lines[1:])
                 output = f"{first}\n{rest}" if rest else first
-                print(output, file=self._status_stream(), flush=True)
+                print(_gray(output), file=self._status_stream(), flush=True)
         elif item.show_output and content.strip():
             # Check for background-promotion message — show a compact status
             # line instead of the full multi-line instruction block.
             display = _maybe_format_background(content) or content
             indented = "\n".join(f"     {line}" for line in display.splitlines())
-            print(f"\n{indented}", file=self._status_stream(), flush=True)
+            print(_gray(f"\n{indented}"), file=self._status_stream(), flush=True)
         self._after_tool = True
 
 
