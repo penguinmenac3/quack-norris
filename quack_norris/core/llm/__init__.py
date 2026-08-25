@@ -39,6 +39,7 @@ see :mod:`quack_norris.core.llm.config` for the full merge semantics)::
 """
 
 from quack_norris.core.llm.config import ContextManagementConfig
+from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.llm import LLM
 from quack_norris.core.llm.provider import (
     AssistantMessage,
@@ -57,6 +58,7 @@ from quack_norris.core.llm.tool import ApprovalState, Param, Tool, ToolCallReque
 __all__ = [
     # Facade
     "LLM",
+    "LLMAPIError",
     "ContextManagementConfig",
     "ToolDefinition",
     # Tool primitives

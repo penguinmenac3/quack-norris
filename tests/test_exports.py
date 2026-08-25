@@ -15,6 +15,7 @@ EXPECTED_AGENT_EXPORTS = {
     "AgentOutput",
     "CheckpointOutput",
     "ContextPolicy",
+    "ErrorOutput",
     "MessageEnd",
     "NudgeOutput",
     "TextOutput",
@@ -64,6 +65,7 @@ def test_agent_does_not_export_llm_symbols() -> None:
 
 EXPECTED_LLM_EXPORTS = {
     "LLM",
+    "LLMAPIError",
     "ContextManagementConfig",
     "ToolDefinition",
     "CheckpointMessage",

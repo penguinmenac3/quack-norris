@@ -281,6 +281,7 @@ async def _run_turn(
 
     from quack_norris.core.agent import (
         CheckpointOutput,
+        ErrorOutput,
         MessageEnd,
         NudgeOutput,
         TextOutput,
@@ -315,6 +316,9 @@ async def _run_turn(
 
         elif isinstance(item, CheckpointOutput):
             log_checkpoint(session_id, item, trigger="auto")
+
+        elif isinstance(item, ErrorOutput):
+            _log_system_hint(session_id, f"[System: LLM error] {item.message}")
 
         elif isinstance(item, ToolCallOutput):
             _log_tool_call_start(session_id, item.tool_call_id, item.tool_name, item.arguments)

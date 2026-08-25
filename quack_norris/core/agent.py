@@ -28,6 +28,7 @@ from quack_norris.core.llm import (
     ApprovalState,
     AssistantMessage,
     ChatMessage,
+    LLMAPIError,
     TextDelta,
     ThinkingDelta,
     ToolResultMessage,
@@ -42,6 +43,7 @@ __all__ = [
     "AgentOutput",
     "CheckpointOutput",
     "ContextPolicy",
+    "ErrorOutput",
     "MessageEnd",
     "NudgeOutput",
     "TextOutput",
@@ -113,6 +115,19 @@ class NudgeOutput:
     text: str
 
 
+@dataclass
+class ErrorOutput:
+    """An LLM provider call failed (rate limit, bad route, connection drop, ...).
+
+    Emitted instead of letting the exception crash the process, so the CLI
+    can show the user a clear message and let them take action (e.g. switch
+    models with ``/model``) instead of the turn dying with a raw traceback.
+    """
+
+    message: str
+    retryable: bool = False
+
+
 AgentOutput = (
     TextOutput
     | ThinkingOutput
@@ -121,6 +136,7 @@ AgentOutput = (
     | MessageEnd
     | NudgeOutput
     | CheckpointOutput
+    | ErrorOutput
 )
 
 # ---------------------------------------------------------------------------
@@ -130,6 +146,16 @@ AgentOutput = (
 _MAX_ITERATIONS = 64
 _INTERRUPTED = "---interrupted---"
 _EMPTY_RESPONSE_NUDGE = "Your last response was empty. Please try again."
+
+
+def _format_llm_error(exc: LLMAPIError) -> str:
+    """Build a user-facing message for an :class:`LLMAPIError`, with next steps."""
+    hint = (
+        "This looks temporary — you can wait a moment and try again, "
+        if exc.retryable
+        else ""
+    )
+    return f"{exc.message}\n{hint}or switch models with /model <name>."
 
 
 async def agent(
@@ -223,6 +249,13 @@ async def agent(
             full_text = "".join(text_chunks) + suffix
             history.append(AssistantMessage(content=full_text, tool_calls=[]))
             await on_output(MessageEnd(text=full_text, tool_call_ids=[]))
+            return full_text
+        except LLMAPIError as exc:
+            await on_output(ErrorOutput(message=_format_llm_error(exc), retryable=exc.retryable))
+            full_text = "".join(text_chunks)
+            if full_text:
+                history.append(AssistantMessage(content=full_text, tool_calls=[]))
+                await on_output(MessageEnd(text=full_text, tool_call_ids=[]))
             return full_text
 
         full_text = "".join(text_chunks)

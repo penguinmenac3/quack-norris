@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from quack_norris.core.llm import LLM
+from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import TextDelta, ToolDefinition, UsageInfo
 from quack_norris.core.llm.providers.copilot import (
     CopilotProvider,
@@ -18,6 +20,7 @@ from quack_norris.core.llm.providers.copilot import (
     _parse_endpoint,
     _save_token,
     _token_path,
+    _translate_http_error,
     _use_responses_api,
 )
 from quack_norris.core.llm.tool import ToolCallRequest
@@ -169,21 +172,26 @@ async def test_converse_tool_call(provider: CopilotProvider) -> None:
     assert tool_calls[0].arguments == {"x": 42}
 
 
+def _responses_stub(client: MagicMock, response_json: dict) -> None:
+    mock_r = MagicMock()
+    mock_r.raise_for_status = MagicMock()
+    mock_r.json = MagicMock(return_value=response_json)
+    client.post = AsyncMock(return_value=mock_r)
+
+
 @pytest.mark.asyncio
 async def test_converse_responses_api(provider: CopilotProvider) -> None:
     """GPT-5 class uses the Responses API (non-streaming)."""
     response_json = {
-        "output": [{"content": [{"text": "I am GPT-5."}]}],
+        "output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "I am GPT-5."}]},
+        ],
     }
-
-    mock_r = MagicMock()
-    mock_r.raise_for_status = MagicMock()
-    mock_r.json = MagicMock(return_value=response_json)
 
     mock_client = MagicMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.post = AsyncMock(return_value=mock_r)
+    _responses_stub(mock_client, response_json)
 
     with patch("quack_norris.core.llm.providers.copilot.httpx.AsyncClient", return_value=mock_client):
         items = []
@@ -192,6 +200,99 @@ async def test_converse_responses_api(provider: CopilotProvider) -> None:
 
     texts = [i.text for i in items if isinstance(i, TextDelta)]
     assert texts == ["I am GPT-5."]
+
+
+@pytest.mark.asyncio
+async def test_converse_responses_api_skips_leading_reasoning_item(
+    provider: CopilotProvider,
+) -> None:
+    """Reasoning models emit a ``reasoning`` item (no text) before the ``message`` item."""
+    response_json = {
+        "output": [
+            {"type": "reasoning", "content": []},
+            {"type": "message", "content": [{"type": "output_text", "text": "Reasoned answer."}]},
+        ],
+    }
+
+    mock_client = MagicMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    _responses_stub(mock_client, response_json)
+
+    target = "quack_norris.core.llm.providers.copilot.httpx.AsyncClient"
+    with patch(target, return_value=mock_client):
+        items = []
+        async for item in provider.converse("gpt-5", "sys", [], []):
+            items.append(item)
+
+    texts = [i.text for i in items if isinstance(i, TextDelta)]
+    assert texts == ["Reasoned answer."]
+
+
+@pytest.mark.asyncio
+async def test_converse_responses_api_no_message_item_raises_llm_api_error(
+    provider: CopilotProvider,
+) -> None:
+    """No ``message`` item in ``output`` → a clean LLMAPIError, not an IndexError."""
+    response_json = {"output": [{"type": "reasoning", "content": []}]}
+
+    mock_client = MagicMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    _responses_stub(mock_client, response_json)
+
+    target = "quack_norris.core.llm.providers.copilot.httpx.AsyncClient"
+    with patch(target, return_value=mock_client), pytest.raises(LLMAPIError):
+        async for _ in provider.converse("gpt-5", "sys", [], []):
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Error translation
+# ---------------------------------------------------------------------------
+
+def test_translate_http_status_error() -> None:
+    request = httpx.Request("POST", "https://api.githubcopilot.com/chat/completions")
+    response = httpx.Response(429, request=request, text="rate limited")
+    exc = httpx.HTTPStatusError("429", request=request, response=response)
+    result = _translate_http_error(exc, "gpt-4.1")
+    assert isinstance(result, LLMAPIError)
+    assert result.status_code == 429
+    assert result.retryable is True
+    assert "gpt-4.1" in result.message
+
+
+def test_translate_http_connect_error() -> None:
+    request = httpx.Request("POST", "https://api.githubcopilot.com/chat/completions")
+    exc = httpx.ConnectError("connection refused", request=request)
+    result = _translate_http_error(exc, "gpt-4.1")
+    assert result.status_code is None
+    assert result.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_converse_raises_llm_api_error_on_bad_status(provider: CopilotProvider) -> None:
+    request = httpx.Request("POST", "https://api.githubcopilot.com/chat/completions")
+    response = httpx.Response(404, request=request, text="no Route matched with those values")
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError("404", request=request, response=response)
+    )
+    mock_response.aiter_lines = lambda: aiter_from([])
+
+    mock_client = MagicMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.stream.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_client.stream.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    target = "quack_norris.core.llm.providers.copilot.httpx.AsyncClient"
+    with patch(target, return_value=mock_client), pytest.raises(LLMAPIError) as excinfo:
+        async for _ in provider.converse("gpt-4.1", "sys", [], []):
+            pass
+
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.retryable is False
 
 
 # ---------------------------------------------------------------------------

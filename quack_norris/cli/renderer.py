@@ -13,6 +13,7 @@ from quack_norris.cli.md_stream_renderer import MdStreamRenderer
 from quack_norris.core.agent import (
     AgentOutput,
     CheckpointOutput,
+    ErrorOutput,
     TextOutput,
     ThinkingOutput,
     ToolCallOutput,
@@ -64,6 +65,8 @@ class Renderer:
             self._handle_tool_result(item)
         elif isinstance(item, CheckpointOutput):
             self._handle_checkpoint(item)
+        elif isinstance(item, ErrorOutput):
+            self._handle_error(item)
 
     def finish_turn(self) -> None:
         """Call after agent turn completes to ensure trailing newline."""
@@ -115,6 +118,20 @@ class Renderer:
             file=self._status_stream(),
             flush=True,
         )
+        self._after_tool = True
+
+    def _handle_error(self, item: ErrorOutput) -> None:
+        if self._in_thinking:
+            print(_gray("\n</think>"), file=self._text_stream())
+            self._in_thinking = False
+        if self._in_text:
+            print(file=self._text_stream())
+            self._in_text = False
+        lines = item.message.splitlines()
+        first = f"  ⚠ {lines[0]}" if lines else "  ⚠"
+        rest = "\n".join(f"     {line}" for line in lines[1:])
+        output = f"{first}\n{rest}" if rest else first
+        print(_gray(f"\n{output}"), file=self._status_stream(), flush=True)
         self._after_tool = True
 
     def _handle_tool_call(self, item: ToolCallOutput) -> None:

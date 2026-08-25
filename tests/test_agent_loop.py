@@ -10,11 +10,13 @@ import pytest
 
 from quack_norris.core.agent import (
     AgentOutput,
+    ErrorOutput,
     TextOutput,
     ToolCallOutput,
     agent,
 )
 
+from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import TextDelta, UserMessage
 from quack_norris.core.llm.tool import Tool, ToolCallRequest, ToolResult
 
@@ -271,3 +273,62 @@ async def test_cancellation_mid_tool_execution() -> None:
     assert len(tool_results) == 2
     assert all(o.result.is_error for o in tool_results)
     assert all(o.result.content == "---interrupted---" for o in tool_results)
+
+
+@pytest.mark.asyncio
+async def test_llm_api_error_mid_stream_emits_error_output() -> None:
+    """A provider LLMAPIError is turned into an ErrorOutput instead of crashing."""
+    outputs: list[AgentOutput] = []
+
+    async def failing_stream():
+        yield TextDelta(text="Hello")
+        raise LLMAPIError("rate limited", status_code=429, retryable=True)
+
+    with patch(
+        "quack_norris.core.agent.LLM.converse",
+        return_value=failing_stream(),
+    ):
+        result = await agent(
+            model="ollama/test",
+            system_prompt="sys",
+            tools=[],
+            chat_history=[UserMessage(content="hi")],
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender(outputs),
+        )
+
+    assert result == "Hello"
+    errors = [o for o in outputs if isinstance(o, ErrorOutput)]
+    assert len(errors) == 1
+    assert "rate limited" in errors[0].message
+    assert "/model" in errors[0].message
+    assert errors[0].retryable is True
+
+
+@pytest.mark.asyncio
+async def test_llm_api_error_before_any_text_does_not_crash() -> None:
+    """LLMAPIError raised before any text/tool output still returns cleanly."""
+    outputs: list[AgentOutput] = []
+
+    async def failing_stream():
+        raise LLMAPIError("no route matched", status_code=404, retryable=False)
+        yield  # pragma: no cover - makes this an async generator
+
+    with patch(
+        "quack_norris.core.agent.LLM.converse",
+        return_value=failing_stream(),
+    ):
+        result = await agent(
+            model="ollama/test",
+            system_prompt="sys",
+            tools=[],
+            chat_history=[UserMessage(content="hi")],
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender(outputs),
+        )
+
+    assert result == ""
+    errors = [o for o in outputs if isinstance(o, ErrorOutput)]
+    assert len(errors) == 1
+    assert errors[0].retryable is False
+    assert not any(isinstance(o, TextOutput) for o in outputs)

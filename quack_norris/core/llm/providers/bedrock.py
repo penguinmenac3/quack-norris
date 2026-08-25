@@ -18,6 +18,7 @@ import threading
 from collections.abc import AsyncIterator
 from typing import Any
 
+from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import (
     AssistantMessage,
     ChatMessage,
@@ -29,6 +30,36 @@ from quack_norris.core.llm.provider import (
     UsageInfo,
 )
 from quack_norris.core.llm.tool import ToolCallRequest
+
+_RETRYABLE_BEDROCK_CODES = {
+    "ThrottlingException",
+    "ServiceUnavailableException",
+    "ModelTimeoutException",
+    "ModelNotReadyException",
+}
+
+
+def _translate_bedrock_error(exc: Exception, model_name: str) -> LLMAPIError:
+    """Translate a boto3/Bedrock exception into a normalised :class:`LLMAPIError`.
+
+    Uses duck typing rather than importing ``botocore.exceptions.ClientError``
+    directly, since ``boto3`` is an optional dependency.
+    """
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        error = response.get("Error", {})
+        code = error.get("Code", "")
+        message = error.get("Message", str(exc))
+        status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        retryable = code in _RETRYABLE_BEDROCK_CODES or (
+            status is not None and status >= 500
+        )
+        return LLMAPIError(
+            f"Bedrock error ({code or status}) while calling model '{model_name}': {message}",
+            status_code=status,
+            retryable=retryable,
+        )
+    return LLMAPIError(f"Bedrock request to '{model_name}' failed: {exc}")
 
 
 class BedrockProvider:
@@ -150,7 +181,7 @@ class BedrockProvider:
             if item is None:
                 break
             if isinstance(item, Exception):
-                raise item
+                raise _translate_bedrock_error(item, model_name) from item
             yield item
 
         thread.join()

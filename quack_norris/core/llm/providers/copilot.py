@@ -33,6 +33,7 @@ from typing import Any
 
 import httpx
 
+from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import (
     AssistantMessage,
     ChatMessage,
@@ -43,6 +44,53 @@ from quack_norris.core.llm.provider import (
     UsageInfo,
 )
 from quack_norris.core.llm.tool import ToolCallRequest
+
+
+def _extract_responses_text(payload: dict[str, Any], model_name: str) -> str:
+    """Pull the assistant's text out of a Responses API payload.
+
+    ``output`` is a list of heterogeneous items — reasoning models (GPT-5+)
+    typically emit a ``reasoning`` item *before* the ``message`` item that
+    actually carries the text, and the ``reasoning`` item has no (or empty)
+    ``content``. Scan for the first ``message`` item instead of assuming
+    ``output[0]`` is it.
+    """
+    output = payload.get("output") or []
+    for item in output:
+        if item.get("type") != "message":
+            continue
+        parts = item.get("content") or []
+        text = "".join(
+            p.get("text", "") for p in parts if p.get("type") == "output_text"
+        )
+        if text:
+            return text
+        refusal = next((p.get("refusal", "") for p in parts if p.get("type") == "refusal"), "")
+        if refusal:
+            raise LLMAPIError(f"Model '{model_name}' refused the request: {refusal}")
+    raise LLMAPIError(
+        f"Copilot Responses API returned no message text for model '{model_name}' "
+        f"(response: {payload!r})"
+    )
+
+
+def _translate_http_error(exc: Exception, model_name: str) -> LLMAPIError:
+    """Translate an ``httpx`` exception into a normalised :class:`LLMAPIError`."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        body = exc.response.text
+        return LLMAPIError(
+            f"Copilot API error ({status}) while calling model '{model_name}': {body}",
+            status_code=status,
+            retryable=status == 429 or status >= 500,
+        )
+    if isinstance(exc, httpx.HTTPError):
+        return LLMAPIError(
+            f"Could not reach the Copilot API for model '{model_name}': {exc}",
+            retryable=True,
+        )
+    return LLMAPIError(f"Copilot request to '{model_name}' failed: {exc}")
+
 
 # The OAuth client-id for the quack-norris Copilot integration (same as
 # copilot_client.py at the project root).
@@ -304,52 +352,55 @@ class CopilotProvider:
 
         pending_calls: dict[int, dict[str, str]] = {}
 
-        async with httpx.AsyncClient(timeout=120) as client:
-            async with client.stream(
-                "POST",
-                f"{self._base_url}/chat/completions",
-                headers=_headers(token),
-                json=payload,
-            ) as response:
-                response.raise_for_status()
-                async for raw_line in response.aiter_lines():
-                    if not raw_line.startswith("data: "):
-                        continue
-                    data = raw_line[len("data: "):]
-                    if data.strip() == "[DONE]":
-                        break
-                    try:
-                        chunk = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self._base_url}/chat/completions",
+                    headers=_headers(token),
+                    json=payload,
+                ) as response:
+                    response.raise_for_status()
+                    async for raw_line in response.aiter_lines():
+                        if not raw_line.startswith("data: "):
+                            continue
+                        data = raw_line[len("data: "):]
+                        if data.strip() == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
 
-                    choices = chunk.get("choices") or []
-                    if not choices:
-                        continue
-                    delta = choices[0].get("delta") or {}
+                        choices = chunk.get("choices") or []
+                        if not choices:
+                            continue
+                        delta = choices[0].get("delta") or {}
 
-                    # Text tokens
-                    content = delta.get("content")
-                    if content:
-                        yield TextDelta(text=content)
+                        # Text tokens
+                        content = delta.get("content")
+                        if content:
+                            yield TextDelta(text=content)
 
-                    # Tool call chunks
-                    for tc in delta.get("tool_calls") or []:
-                        idx = tc.get("index", 0)
-                        if idx not in pending_calls:
-                            pending_calls[idx] = {
-                                "id": tc.get("id") or "",
-                                "name": (tc.get("function") or {}).get("name") or "",
-                                "arguments": "",
-                            }
-                        else:
-                            if tc.get("id"):
-                                pending_calls[idx]["id"] = tc["id"]
+                        # Tool call chunks
+                        for tc in delta.get("tool_calls") or []:
+                            idx = tc.get("index", 0)
+                            if idx not in pending_calls:
+                                pending_calls[idx] = {
+                                    "id": tc.get("id") or "",
+                                    "name": (tc.get("function") or {}).get("name") or "",
+                                    "arguments": "",
+                                }
+                            else:
+                                if tc.get("id"):
+                                    pending_calls[idx]["id"] = tc["id"]
+                                fn = tc.get("function") or {}
+                                if fn.get("name"):
+                                    pending_calls[idx]["name"] = fn["name"]
                             fn = tc.get("function") or {}
-                            if fn.get("name"):
-                                pending_calls[idx]["name"] = fn["name"]
-                        fn = tc.get("function") or {}
-                        pending_calls[idx]["arguments"] += fn.get("arguments") or ""
+                            pending_calls[idx]["arguments"] += fn.get("arguments") or ""
+        except httpx.HTTPError as exc:
+            raise _translate_http_error(exc, model_name) from exc
 
         # Emit accumulated tool calls
         for _idx in sorted(pending_calls):
@@ -374,13 +425,22 @@ class CopilotProvider:
         chat_history: list[ChatMessage],
     ) -> AsyncIterator[LLMOutput]:
         messages = _encode_messages(system_prompt, chat_history)
-        async with httpx.AsyncClient(timeout=120) as client:
-            r = await client.post(
-                f"{self._base_url}/responses",
-                headers=_headers(token),
-                json={"model": model_name, "input": messages},
-            )
-            r.raise_for_status()
-            text = r.json()["output"][0]["content"][0]["text"]
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                r = await client.post(
+                    f"{self._base_url}/responses",
+                    headers=_headers(token),
+                    json={"model": model_name, "input": messages},
+                )
+                r.raise_for_status()
+                text = _extract_responses_text(r.json(), model_name)
+        except httpx.HTTPError as exc:
+            raise _translate_http_error(exc, model_name) from exc
+        except LLMAPIError:
+            raise
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise LLMAPIError(
+                f"Could not parse Copilot Responses API reply for model '{model_name}': {exc}"
+            ) from exc
         yield TextDelta(text=text)
         yield UsageInfo(input_tokens=0, output_tokens=0)

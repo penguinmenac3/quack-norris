@@ -18,6 +18,7 @@ from typing import Any
 
 import openai
 
+from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import (
     AssistantMessage,
     ChatMessage,
@@ -31,6 +32,29 @@ from quack_norris.core.llm.provider import (
 from quack_norris.core.llm.tool import ToolCallRequest
 
 _DEFAULT_BASE_URL = "http://localhost:11434/v1"
+
+
+def _translate_openai_error(exc: openai.OpenAIError, model_name: str) -> LLMAPIError:
+    """Translate an ``openai`` SDK exception into a normalised :class:`LLMAPIError`."""
+    if isinstance(exc, openai.RateLimitError):
+        return LLMAPIError(
+            f"Rate limited while calling model '{model_name}': {exc}",
+            status_code=429,
+            retryable=True,
+        )
+    if isinstance(exc, openai.APIStatusError):
+        status = exc.status_code
+        return LLMAPIError(
+            f"API error ({status}) while calling model '{model_name}': {exc}",
+            status_code=status,
+            retryable=status >= 500,
+        )
+    if isinstance(exc, (openai.APITimeoutError, openai.APIConnectionError)):
+        return LLMAPIError(
+            f"Could not reach the API for model '{model_name}': {exc}",
+            retryable=True,
+        )
+    return LLMAPIError(f"LLM request to '{model_name}' failed: {exc}")
 
 
 def _encode_messages(
@@ -115,41 +139,44 @@ class OpenAIProvider:
         # Accumulators for streamed tool calls (index → {id, name, arguments_json})
         pending_calls: dict[int, dict[str, str]] = {}
 
-        stream = await self._client.chat.completions.create(**kwargs)
-        async for chunk in stream:
-            delta = chunk.choices[0].delta if chunk.choices else None
-            if delta is None:
-                continue
+        try:
+            stream = await self._client.chat.completions.create(**kwargs)
+            async for chunk in stream:
+                delta = chunk.choices[0].delta if chunk.choices else None
+                if delta is None:
+                    continue
 
-            # Content tokens
-            if delta.content:
-                yield TextDelta(text=delta.content)
+                # Content tokens
+                if delta.content:
+                    yield TextDelta(text=delta.content)
 
-            # Thinking / reasoning tokens (custom field from some providers)
-            reasoning = getattr(delta, "reasoning", None) or getattr(
-                delta, "reasoning_content", None
-            )
-            if reasoning:
-                yield ThinkingDelta(text=reasoning)
+                # Thinking / reasoning tokens (custom field from some providers)
+                reasoning = getattr(delta, "reasoning", None) or getattr(
+                    delta, "reasoning_content", None
+                )
+                if reasoning:
+                    yield ThinkingDelta(text=reasoning)
 
-            # Tool call chunks — accumulate across streamed deltas
-            if delta.tool_calls:
-                for tc in delta.tool_calls:
-                    idx = tc.index
-                    if idx not in pending_calls:
-                        pending_calls[idx] = {
-                            "id": tc.id or "",
-                            "name": (tc.function.name if tc.function else "") or "",
-                            "arguments": "",
-                        }
-                    else:
-                        if tc.id:
-                            pending_calls[idx]["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            pending_calls[idx]["name"] = tc.function.name
-                    pending_calls[idx]["arguments"] += (
-                        tc.function.arguments if tc.function else ""
-                    ) or ""
+                # Tool call chunks — accumulate across streamed deltas
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        idx = tc.index
+                        if idx not in pending_calls:
+                            pending_calls[idx] = {
+                                "id": tc.id or "",
+                                "name": (tc.function.name if tc.function else "") or "",
+                                "arguments": "",
+                            }
+                        else:
+                            if tc.id:
+                                pending_calls[idx]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                pending_calls[idx]["name"] = tc.function.name
+                        pending_calls[idx]["arguments"] += (
+                            tc.function.arguments if tc.function else ""
+                        ) or ""
+        except openai.OpenAIError as exc:
+            raise _translate_openai_error(exc, model_name) from exc
 
         # Emit accumulated tool calls as a single batch at the end
         if pending_calls:
