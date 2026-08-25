@@ -10,6 +10,7 @@ was already approved by the user — there is nothing new to authorise.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Annotated
 
 from quack_norris.core.llm import Param, Tool, ToolResult, tool
@@ -19,7 +20,7 @@ from quack_norris.tools.background import ProcessRegistry
 _BG_RUNNING_PREFIX = "⏳ still running"
 
 
-def make_background_tools(registry: ProcessRegistry) -> list[Tool]:
+def make_operation_tools(registry: ProcessRegistry) -> list[Tool]:
     """Return [check_tool, await_tool, kill_tool] bound to *registry*."""
 
     # ------------------------------------------------------------------ #
@@ -103,17 +104,15 @@ def make_background_tools(registry: ProcessRegistry) -> list[Tool]:
                 content=f"Process {handle} already finished (exit code {ec})."
             )
 
-        try:
+        with contextlib.suppress(ProcessLookupError):  # already gone
             rp.proc.kill()
-        except ProcessLookupError:
-            pass  # already gone
 
         # Wait for drain task to flush remaining output before returning.
         if rp._drain_task is not None:
             try:
                 import asyncio
                 await asyncio.wait_for(rp._drain_task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
         output = rp.buffered_output()
@@ -123,3 +122,6 @@ def make_background_tools(registry: ProcessRegistry) -> list[Tool]:
         return ToolResult(content=body)
 
     return [check_tool, await_tool, kill_tool]
+
+
+make_background_tools = make_operation_tools

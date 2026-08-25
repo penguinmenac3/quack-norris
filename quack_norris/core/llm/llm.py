@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import logging
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quack_norris.core.llm.config import (
     ContextManagementConfig,
@@ -23,7 +25,12 @@ from quack_norris.core.llm.provider import (
     ToolDefinition,
     ToolParameter,
 )
-from quack_norris.core.llm.providers import AzureOpenAIProvider, BedrockProvider, CopilotProvider, OpenAIProvider
+from quack_norris.core.llm.providers import (
+    AzureOpenAIProvider,
+    BedrockProvider,
+    CopilotProvider,
+    OpenAIProvider,
+)
 from quack_norris.core.llm.tool import Tool, ToolCallRequest, ToolResult
 
 _DEFAULT_CONFIG_NAME = "config.yaml"
@@ -120,6 +127,9 @@ class LLM:
     _configs: list[LLMConfig] = []
     _default_model: str | None = None
     _context_config: ContextManagementConfig = ContextManagementConfig()
+    _discovered_models: set[str] = set()
+    _models_refreshed: bool = False
+    _setup_path: Path | None = None
 
     # ------------------------------------------------------------------
     # Setup
@@ -157,6 +167,7 @@ class LLM:
                     break
 
         local_raw = load_yaml(local_path) if local_path is not None else {}
+        cls._setup_path = local_path.resolve() if path is not None and local_path else None
 
         if not global_raw and not local_raw:
             raise FileNotFoundError(
@@ -173,6 +184,8 @@ class LLM:
         cls._context_config = parse_context_management_config(raw)
         cls._groups = {}
         cls._model_map = {}
+        cls._discovered_models = set()
+        cls._models_refreshed = False
 
         for cfg in configs:
             try:
@@ -186,6 +199,11 @@ class LLM:
             if cfg.models is not None:
                 for model in cfg.models:
                     cls._model_map[f"{cfg.group}/{model}"] = provider
+
+    @classmethod
+    def reload(cls) -> None:
+        """Reload the same explicit or auto-discovered configuration source."""
+        cls.setup(cls._setup_path)
 
     # ------------------------------------------------------------------
     # Converse
@@ -258,9 +276,9 @@ class LLM:
                     # (e.g. absolute project paths already rewritten to relative).
                     if matched.pre_execute_hook is not None:
                         rewritten = matched.pre_execute_hook(item.arguments)
-                        if hasattr(rewritten, "__await__"):
+                        if inspect.isawaitable(rewritten):
                             rewritten = await rewritten
-                        item.arguments = rewritten
+                        item.arguments = cast(dict[str, Any], rewritten)
 
                     _args = item.arguments
                     item.execute = _execute
@@ -312,6 +330,40 @@ class LLM:
     def configs(cls) -> list[LLMConfig]:
         """Return raw config entries (useful for context window lookups)."""
         return list(cls._configs)
+
+    @classmethod
+    async def refresh_available_models(cls, *, force: bool = False) -> list[str]:
+        """Discover models from dynamic providers and return all selector values."""
+        if cls._models_refreshed and not force:
+            return cls.available_models()
+        discovered: set[str] = set()
+        for group, providers in cls._groups.items():
+            for provider, static_models in providers:
+                if static_models is not None:
+                    continue
+                list_models = getattr(provider, "list_models", None)
+                if list_models is None:
+                    continue
+                try:
+                    models = list_models()
+                    if inspect.isawaitable(models):
+                        models = await asyncio.wait_for(models, timeout=5.0)
+                    discovered.update(
+                        f"{group}/{model}" for model in cast(list[str], models)
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    _log.warning("Could not discover models for group '%s': %s", group, exc)
+        cls._discovered_models = discovered
+        cls._models_refreshed = True
+        return cls.available_models()
+
+    @classmethod
+    def available_models(cls) -> list[str]:
+        """Return static, discovered, and default models for selectors."""
+        models = set(cls._model_map) | cls._discovered_models
+        if cls._default_model:
+            models.add(cls._default_model)
+        return sorted(models, key=str.casefold)
 
     @classmethod
     def default_model(cls) -> str | None:

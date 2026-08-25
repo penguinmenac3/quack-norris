@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-import quack_norris.core.agent as agent_module
+import importlib
+
 import quack_norris.core.llm as llm_module
+
+agent_module = importlib.import_module("quack_norris.core.agent")
 
 
 # ---------------------------------------------------------------------------
@@ -18,6 +21,7 @@ EXPECTED_AGENT_EXPORTS = {
     "ErrorOutput",
     "MessageEnd",
     "NudgeOutput",
+    "SkillInfo",
     "TextOutput",
     "ThinkingOutput",
     "ToolCallOutput",
@@ -99,6 +103,13 @@ def test_llm_all_symbols_exist() -> None:
 
 def test_agent_symbols_not_in_llm_all() -> None:
     """Agent-layer output types are NOT in llm.__all__."""
-    agent_only = {"AgentOutput", "TextOutput", "ThinkingOutput", "ToolCallOutput", "ToolResultOutput", "agent"}
+    agent_only = {
+        "AgentOutput",
+        "TextOutput",
+        "ThinkingOutput",
+        "ToolCallOutput",
+        "ToolResultOutput",
+        "agent",
+    }
     leaked = agent_only & set(llm_module.__all__)
     assert not leaked, f"llm.__all__ contains agent symbols: {leaked}"

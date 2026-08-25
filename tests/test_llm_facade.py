@@ -17,10 +17,18 @@ def _reset_llm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     LLM._groups = {}
     LLM._model_map = {}
     LLM._configs = []
+    LLM._default_model = None
+    LLM._discovered_models = set()
+    LLM._models_refreshed = False
+    LLM._setup_path = None
     yield
     LLM._groups = {}
     LLM._model_map = {}
     LLM._configs = []
+    LLM._default_model = None
+    LLM._discovered_models = set()
+    LLM._models_refreshed = False
+    LLM._setup_path = None
 
 
 def _yaml(tmp_path: Path, content: str) -> Path:
@@ -47,6 +55,24 @@ def test_setup_registers_groups(tmp_path: Path) -> None:
     )
     LLM.setup(tmp_path / "llms.yaml")
     assert LLM.groups() == ["ollama", "openai"]
+
+
+def test_reload_uses_same_explicit_config(tmp_path: Path) -> None:
+    config = _yaml(
+        tmp_path,
+        "defaults:\n  model: ollama/first\n"
+        "llms:\n  - group: ollama\n    api_endpoint: http://x\n",
+    )
+    LLM.setup(config)
+    config.write_text(
+        "defaults:\n  model: ollama/second\n"
+        "llms:\n  - group: ollama\n    api_endpoint: http://x\n",
+        encoding="utf-8",
+    )
+
+    LLM.reload()
+
+    assert LLM.default_model() == "ollama/second"
 
 
 @pytest.mark.asyncio
@@ -87,6 +113,24 @@ def test_resolve_static_model_fast_path(tmp_path: Path) -> None:
     assert model_a == "gpt-4o"
     assert model_b == "gpt-4o-mini"
     assert provider_a is provider_b  # same provider object
+
+
+@pytest.mark.asyncio
+async def test_refresh_available_models_discovers_dynamic_provider_models() -> None:
+    class DynamicProvider:
+        async def list_models(self) -> list[str]:
+            return ["granite4:micro-h", "qwen3:14b"]
+
+    LLM._groups = {"ollama": [(DynamicProvider(), None)]}
+    LLM._default_model = "nexus/default"
+
+    models = await LLM.refresh_available_models()
+
+    assert models == [
+        "nexus/default",
+        "ollama/granite4:micro-h",
+        "ollama/qwen3:14b",
+    ]
 
 
 @pytest.mark.asyncio

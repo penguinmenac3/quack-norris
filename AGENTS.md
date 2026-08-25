@@ -4,17 +4,6 @@ Follow these conventions when working in this codebase.
 
 ---
 
-## CLI Status Tracking
-
-**`CLI_STATUS.md` is the source of truth for what is and isn't implemented in the CLI.**
-
-- When you implement a new feature, fix a gap, or complete something listed under **Not yet implemented**, update `CLI_STATUS.md` accordingly.
-- Move completed items into the **Implemented** section with a concise description matching the style of existing entries (one bullet, dense, factual).
-- When you add a genuinely new capability that wasn't previously tracked, add it to **Implemented**.
-- Do not remove or reword existing entries without good reason — the history of what was built and how it works is intentional.
-
----
-
 ## Running Tests
 
 Use `uv run python -m pytest` from the project root:

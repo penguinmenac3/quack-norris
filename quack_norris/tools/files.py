@@ -165,21 +165,18 @@ def attach_path_normalizer(tools: "list[Tool]", get_root: "Callable[[], Path]") 
 
 def make_file_tools(
     get_cwd: Callable[[], Path],
-    session_id: str | None = None,
+    auto_approved_root: Path | None = None,
 ) -> list[Tool]:
     """Return file tool instances that resolve relative paths against get_cwd().
 
-    When *session_id* is given, file operations confined to that session's
-    overflow directory (``<session>/overflow/``) are auto-approved: it holds
-    agent-owned scratch data (spilled tool output), so the agent may freely
-    read, write and delete there.
+    Operations confined to *auto_approved_root* are auto-approved when one is
+    supplied. Hosts may use it for agent-owned scratch data.
     """
 
     def _in_overflow_dir(p: Path) -> bool:
-        if session_id is None:
+        if auto_approved_root is None:
             return False
-        from quack_norris.cli.session import overflow_dir
-        return not _is_outside(p, overflow_dir(session_id))
+        return not _is_outside(p, auto_approved_root)
 
     # -----------------------------------------------------------------------
     # file_view — read file or list directory (auto-approved within project root)
@@ -197,7 +194,7 @@ def make_file_tools(
             paths = [args.get(name) for name in arg_names]
             if not all(paths):
                 return True
-            return not all(_in_overflow_dir(_resolve(p, get_cwd())) for p in paths)
+            return not all(_in_overflow_dir(_resolve(str(p), get_cwd())) for p in paths)
         return _predicate
 
     @tool(needs_approval=_file_view_needs_approval)

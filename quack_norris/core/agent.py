@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from quack_norris.core.context import (
     CheckpointOutput,
@@ -31,10 +31,10 @@ from quack_norris.core.llm import (
     LLMAPIError,
     TextDelta,
     ThinkingDelta,
-    ToolResultMessage,
     Tool,
     ToolCallRequest,
     ToolResult,
+    ToolResultMessage,
     UserMessage,
 )
 
@@ -46,6 +46,7 @@ __all__ = [
     "ErrorOutput",
     "MessageEnd",
     "NudgeOutput",
+    "SkillInfo",
     "TextOutput",
     "ThinkingOutput",
     "ToolCallOutput",
@@ -55,6 +56,12 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Agent output types
 # ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class SkillInfo:
+    name: str
+    description: str
+
 
 @dataclass
 class TextOutput:
@@ -155,18 +162,39 @@ def _format_llm_error(exc: LLMAPIError) -> str:
         if exc.retryable
         else ""
     )
-    return f"{exc.message}\n{hint}or switch models with /model <name>."
+    return f"{exc.message}\n{hint}or select another configured model."
+
+
+def _append_skill_catalog(system_prompt: str, skills: list[SkillInfo] | None) -> str:
+    if not skills:
+        return system_prompt
+    normalized = [
+        SkillInfo(
+            name=" ".join(skill.name.split()),
+            description=" ".join(skill.description.split()),
+        )
+        for skill in skills
+    ]
+    entries = "\n".join(
+        f"- {skill.name}: {skill.description}"
+        for skill in sorted(normalized, key=lambda item: (item.name.casefold(), item.name))
+    )
+    return (
+        f"{system_prompt.rstrip()}\n\n## Available Skills\n\n{entries}\n\n"
+        "Load a relevant skill with the skill invocation tool before following it."
+    )
 
 
 async def agent(
     *,
     model: str,
-    system_prompt: Union[str, Callable[[], str]],
+    system_prompt: str | Callable[[], str],
     tools: list[Tool],
     chat_history: list[ChatMessage],
-    on_permission_request: Callable[[ToolCallOutput], Awaitable[bool]],
+    on_permission_request: Callable[[ToolCallOutput], Awaitable[bool | ToolResult]],
     on_output: Callable[[AgentOutput], Awaitable[None]],
     context: ContextPolicy | None = None,
+    skills: list[SkillInfo] | None = None,
 ) -> str:
     """
     Run the agent loop until the LLM produces a final text response.
@@ -187,8 +215,9 @@ async def agent(
     on_permission_request:
         Called when a tool needs human approval (``needs_approval=True`` or
         ``"human"``).  Receives the :class:`ToolCallOutput` for display;
-        return ``True`` to allow, ``False`` to deny.  When ``needs_approval``
-        is ``"human"`` the whitelist is skipped and this is called directly.
+        return ``True`` to allow, ``False`` to deny, or a ``ToolResult`` with
+        a denial reason.  When ``needs_approval`` is ``"human"`` the
+        whitelist is skipped and this is called directly.
     on_output:
         Called for every :class:`AgentOutput` item as it arrives.
     context:
@@ -197,6 +226,9 @@ async def agent(
         and the oldest messages summarised into a checkpoint once utilisation
         gets too high — and oversized tool results are clipped.  When ``None``
         the history grows unbounded.
+    skills:
+        Optional compact skill metadata appended to the system prompt.  Full
+        instructions remain available through a caller-supplied skill tool.
 
     Returns
     -------
@@ -204,7 +236,12 @@ async def agent(
         The final assistant message (complete text, not streamed).
     """
     history = chat_history
-    _get_prompt = system_prompt if callable(system_prompt) else lambda: system_prompt
+    if isinstance(system_prompt, str):
+        def _get_prompt() -> str:
+            return _append_skill_catalog(system_prompt, skills)
+    else:
+        def _get_prompt() -> str:
+            return _append_skill_catalog(system_prompt(), skills)
 
     for _iteration in range(_MAX_ITERATIONS):
         # ------------------------------------------------------------------ #
@@ -301,7 +338,9 @@ async def agent(
                 else:
                     # Validate args before approval — missing required args go straight back to LLM.
                     matched_tool = next((t for t in tools if t.name == tc.name), None)
-                    validation_error = matched_tool.validate_arguments(tc.arguments) if matched_tool else None
+                    validation_error = (
+                        matched_tool.validate_arguments(tc.arguments) if matched_tool else None
+                    )
                     if validation_error is not None:
                         result = validation_error
                     elif tc.needs_approval is False:

@@ -13,9 +13,10 @@ import pytest
 
 from quack_norris.core.llm import LLM
 from quack_norris.core.llm.errors import LLMAPIError
-from quack_norris.core.llm.provider import TextDelta, ToolDefinition, UsageInfo
+from quack_norris.core.llm.provider import TextDelta, UsageInfo
 from quack_norris.core.llm.providers.copilot import (
     CopilotProvider,
+    _headers,
     _load_token,
     _parse_endpoint,
     _save_token,
@@ -24,7 +25,6 @@ from quack_norris.core.llm.providers.copilot import (
     _use_responses_api,
 )
 from quack_norris.core.llm.tool import ToolCallRequest
-
 
 # ---------------------------------------------------------------------------
 # _use_responses_api
@@ -114,6 +114,32 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> CopilotProvider
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     _save_token("test-token", None)
     return CopilotProvider()
+
+
+@pytest.mark.asyncio
+async def test_list_models(provider: CopilotProvider) -> None:
+    response = MagicMock()
+    response.raise_for_status = MagicMock()
+    response.json.return_value = {
+        "data": [
+            {"id": "gpt-4.1"},
+            {"id": "claude-sonnet-4"},
+            {"id": "gpt-4.1"},
+        ]
+    }
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    client.get = AsyncMock(return_value=response)
+
+    with patch("quack_norris.core.llm.providers.copilot.httpx.AsyncClient", return_value=client):
+        models = await provider.list_models()
+
+    assert models == ["claude-sonnet-4", "gpt-4.1"]
+    client.get.assert_awaited_once_with(
+        "https://api.githubcopilot.com/models",
+        headers=_headers("test-token"),
+    )
 
 
 def _make_stream_mock(lines: list[str]) -> tuple[MagicMock, MagicMock]:

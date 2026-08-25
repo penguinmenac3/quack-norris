@@ -176,8 +176,10 @@ class Tool:
     truncation_allowed: bool = True
 
     # Optional intercept hooks — see class docstring.
-    pre_execute_hook: Callable[[dict[str, Any]], dict[str, Any]] | None = None
-    post_execute_hook: Callable[[ToolResult], ToolResult] | None = None
+    pre_execute_hook: Callable[
+        [dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]
+    ] | None = None
+    post_execute_hook: Callable[[ToolResult], ToolResult | Awaitable[ToolResult]] | None = None
 
     def requires_approval(self, arguments: dict[str, Any]) -> ApprovalState:
         """Resolve needs_approval for a specific set of arguments.

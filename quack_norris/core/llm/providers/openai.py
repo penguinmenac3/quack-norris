@@ -121,6 +121,13 @@ class OpenAIProvider:
             api_key=api_key or "unused",
         )
 
+    async def list_models(self) -> list[str]:
+        try:
+            response = await self._client.models.list()
+            return sorted({model.id for model in response.data}, key=str.casefold)
+        except openai.OpenAIError as exc:
+            raise _translate_openai_error(exc, "model discovery") from exc
+
     async def converse(
         self,
         model_name: str,

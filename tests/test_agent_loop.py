@@ -15,7 +15,6 @@ from quack_norris.core.agent import (
     ToolCallOutput,
     agent,
 )
-
 from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import TextDelta, UserMessage
 from quack_norris.core.llm.tool import Tool, ToolCallRequest, ToolResult
@@ -236,7 +235,7 @@ async def test_cancellation_mid_stream() -> None:
 
 @pytest.mark.asyncio
 async def test_cancellation_mid_tool_execution() -> None:
-    """CancelledError during tool execution closes all pending tool calls and returns interrupted text."""
+    """Cancellation during tool execution closes pending calls and returns interrupted text."""
     from quack_norris.core.agent import ToolResultOutput
 
     outputs: list[AgentOutput] = []
@@ -301,7 +300,7 @@ async def test_llm_api_error_mid_stream_emits_error_output() -> None:
     errors = [o for o in outputs if isinstance(o, ErrorOutput)]
     assert len(errors) == 1
     assert "rate limited" in errors[0].message
-    assert "/model" in errors[0].message
+    assert "another configured model" in errors[0].message
     assert errors[0].retryable is True
 
 
@@ -332,3 +331,57 @@ async def test_llm_api_error_before_any_text_does_not_crash() -> None:
     assert len(errors) == 1
     assert errors[0].retryable is False
     assert not any(isinstance(o, TextOutput) for o in outputs)
+
+
+@pytest.mark.asyncio
+async def test_skill_catalog_is_sorted_and_appended_to_system_prompt() -> None:
+    from quack_norris.core.agent import SkillInfo
+
+    prompts: list[str] = []
+
+    async def fake_converse(model, system_prompt, tools, chat_history):
+        prompts.append(system_prompt)
+        return _stream(TextDelta(text="Done"))
+
+    with patch("quack_norris.core.agent.LLM.converse", side_effect=fake_converse):
+        await agent(
+            model="ollama/test",
+            system_prompt="Base prompt.\n",
+            tools=[],
+            chat_history=[UserMessage(content="go")],
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender([]),
+            skills=[
+                SkillInfo(name="zeta", description="  Last\nskill.  "),
+                SkillInfo(name="Alpha", description="First skill."),
+            ],
+        )
+
+    assert prompts == [
+        "Base prompt.\n\n## Available Skills\n\n"
+        "- Alpha: First skill.\n"
+        "- zeta: Last skill.\n\n"
+        "Load a relevant skill with the skill invocation tool before following it."
+    ]
+
+
+@pytest.mark.asyncio
+async def test_empty_skill_catalog_leaves_system_prompt_unchanged() -> None:
+    prompts: list[str] = []
+
+    async def fake_converse(model, system_prompt, tools, chat_history):
+        prompts.append(system_prompt)
+        return _stream(TextDelta(text="Done"))
+
+    with patch("quack_norris.core.agent.LLM.converse", side_effect=fake_converse):
+        await agent(
+            model="ollama/test",
+            system_prompt="Base prompt.\n",
+            tools=[],
+            chat_history=[UserMessage(content="go")],
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender([]),
+            skills=[],
+        )
+
+    assert prompts == ["Base prompt.\n"]

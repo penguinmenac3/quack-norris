@@ -5,7 +5,10 @@ description = "Reusable LLM + agent core for Quack Norris"
 requires-python = ">=3.12"
 dependencies = [
     "openai>=1.30",
+    "httpx==0.28.1",
     "pyyaml>=6.0",
+    "pip-system-certs>=4.0",
+    "agent-client-protocol==0.12.1",
 ]
 
 [project.optional-dependencies]
@@ -20,9 +23,8 @@ dev = [
 ]
 
 [project.scripts]
-quack-norris         = "quack_norris.cli.__main__:main"
-quack-norris-ui      = "quack_norris.webui.__main__:main"
-quack-norris-manage  = "quack_norris.manage.__main__:main"
+quack-norris         = "quack_norris.acp.__main__:main"
+quack-norris-manage  = "quack_norris.skills_and_agents.manage.__main__:main"
 quack-norris-sandbox = "quack_norris.sandbox:main"
 
 [build-system]
@@ -41,6 +43,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+addopts = "-m 'not live'"
 markers = [
     "live: requires a running LLM endpoint and llms.yaml (deselect with -m 'not live')",
 ]

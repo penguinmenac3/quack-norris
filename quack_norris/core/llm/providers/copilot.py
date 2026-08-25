@@ -310,6 +310,37 @@ class CopilotProvider:
         """Drop the in-memory token (forces re-auth on next call)."""
         self._token = None
 
+    async def list_models(self) -> list[str]:
+        token = self._token or _load_token(self._enterprise_domain)
+        if not token:
+            return []
+        self._token = token
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(
+                    f"{self._base_url}/models",
+                    headers=_headers(token),
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except httpx.HTTPError as exc:
+            raise _translate_http_error(exc, "model discovery") from exc
+        entries = (
+            payload.get("data", payload.get("models", []))
+            if isinstance(payload, dict)
+            else payload
+        )
+        if not isinstance(entries, list):
+            return []
+        return sorted(
+            {
+                entry["id"]
+                for entry in entries
+                if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+            },
+            key=str.casefold,
+        )
+
     # ------------------------------------------------------------------
     # converse
     # ------------------------------------------------------------------
@@ -327,7 +358,9 @@ class CopilotProvider:
             async for item in self._responses_api(token, model_name, system_prompt, chat_history):
                 yield item
         else:
-            async for item in self._chat_completions(token, model_name, system_prompt, tools, chat_history):
+            async for item in self._chat_completions(
+                token, model_name, system_prompt, tools, chat_history
+            ):
                 yield item
 
     # ------------------------------------------------------------------
@@ -353,52 +386,54 @@ class CopilotProvider:
         pending_calls: dict[int, dict[str, str]] = {}
 
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                async with client.stream(
+            async with (
+                httpx.AsyncClient(timeout=120) as client,
+                client.stream(
                     "POST",
                     f"{self._base_url}/chat/completions",
                     headers=_headers(token),
                     json=payload,
-                ) as response:
-                    response.raise_for_status()
-                    async for raw_line in response.aiter_lines():
-                        if not raw_line.startswith("data: "):
-                            continue
-                        data = raw_line[len("data: "):]
-                        if data.strip() == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data)
-                        except json.JSONDecodeError:
-                            continue
+                ) as response,
+            ):
+                response.raise_for_status()
+                async for raw_line in response.aiter_lines():
+                    if not raw_line.startswith("data: "):
+                        continue
+                    data = raw_line[len("data: "):]
+                    if data.strip() == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
 
-                        choices = chunk.get("choices") or []
-                        if not choices:
-                            continue
-                        delta = choices[0].get("delta") or {}
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
 
-                        # Text tokens
-                        content = delta.get("content")
-                        if content:
-                            yield TextDelta(text=content)
+                    # Text tokens
+                    content = delta.get("content")
+                    if content:
+                        yield TextDelta(text=content)
 
-                        # Tool call chunks
-                        for tc in delta.get("tool_calls") or []:
-                            idx = tc.get("index", 0)
-                            if idx not in pending_calls:
-                                pending_calls[idx] = {
-                                    "id": tc.get("id") or "",
-                                    "name": (tc.get("function") or {}).get("name") or "",
-                                    "arguments": "",
-                                }
-                            else:
-                                if tc.get("id"):
-                                    pending_calls[idx]["id"] = tc["id"]
-                                fn = tc.get("function") or {}
-                                if fn.get("name"):
-                                    pending_calls[idx]["name"] = fn["name"]
+                    # Tool call chunks
+                    for tc in delta.get("tool_calls") or []:
+                        idx = tc.get("index", 0)
+                        if idx not in pending_calls:
+                            pending_calls[idx] = {
+                                "id": tc.get("id") or "",
+                                "name": (tc.get("function") or {}).get("name") or "",
+                                "arguments": "",
+                            }
+                        else:
+                            if tc.get("id"):
+                                pending_calls[idx]["id"] = tc["id"]
                             fn = tc.get("function") or {}
-                            pending_calls[idx]["arguments"] += fn.get("arguments") or ""
+                            if fn.get("name"):
+                                pending_calls[idx]["name"] = fn["name"]
+                        fn = tc.get("function") or {}
+                        pending_calls[idx]["arguments"] += fn.get("arguments") or ""
         except httpx.HTTPError as exc:
             raise _translate_http_error(exc, model_name) from exc
 

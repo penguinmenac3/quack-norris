@@ -52,7 +52,7 @@ __all__ = [
 ]
 
 # A crude but stable proxy.  Deliberately not calibrated against reported
-# usage — see the note in CLI_STATUS.md; that is a separate piece of work.
+# usage; real token counting remains a separate piece of work.
 CHARS_PER_TOKEN = 4
 
 # Rough per-message wire overhead (role tags, delimiters) in tokens.
