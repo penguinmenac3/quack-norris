@@ -6,7 +6,7 @@
 
 Quack Norris is a **compact agent core optimized for small language models (SLMs)**. It can be  integrated as an **Agent Client Protocol (ACP) agent** into other agents or UIs or used for custom code as a **Python SDK**.
 
-## ACP Agent
+## 🤖 ACP Agent
 
 Quack Norris works with any ACP-compatible client.
 To use it, install Quack Norris as a command-line tool:
@@ -25,7 +25,7 @@ Create your LLM configuration as described in [LLM configuration](#llm-configura
 quack-norris acp [--config FILE]
 ```
 
-## Python SDK
+## 🧩 Python SDK
 
 Add Quack Norris as an application dependency:
 
@@ -72,7 +72,9 @@ result = await agent(
 )
 ```
 
-## LLM Configuration
+<a id="llm-configuration"></a>
+
+## ⚙️ LLM Configuration
 
 Configuration is loaded from `~/.config/quack-norris/config.yaml`, a project-local `config.yaml`/`llms.yaml`, or a file passed with `--config` in ACP mode.
 
@@ -90,7 +92,7 @@ llms:
 
 Supported providers include OpenAI-compatible endpoints, Ollama, Azure OpenAI, AWS Bedrock, and GitHub Copilot. Static model lists can be configured with `models:`; dynamic OpenAI-compatible and authenticated Copilot providers are discovered through their `/models` endpoints.
 
-## Tools
+## 🛠️ Tools
 
 Quack norris comes with a set of built-in tools to make your life easier. With ACP the tools are used if the client advertises the required capabilities, with the SDK you have control and can add, remove or replace tools as you like.
 
@@ -107,7 +109,7 @@ Quack norris comes with a set of built-in tools to make your life easier. With A
 | `kill_tool` | Cancel a deferred operation |
 | `use_skill` | Load full skill instructions by name |
 
-## Diving Deeper
+## 🔍 Diving Deeper
 
 - [Documentation](docs/00-index.md)
 - Development commands:
@@ -116,4 +118,7 @@ Quack norris comes with a set of built-in tools to make your life easier. With A
   uv run ruff check .
   uv run ty check quack_norris
   ```
-- [License](LICENSE)
+
+## ⚖️ License
+
+[The MIT License (MIT)](LICENSE)
