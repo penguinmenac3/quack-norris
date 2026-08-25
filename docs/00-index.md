@@ -19,5 +19,3 @@ Quack Norris is a stateless SLM-oriented agent core with native tools, agent/ski
 | `quack-norris-sandbox ...` | Create isolated worktrees/containers |
 
 The project does not include an interactive chat client or Web UI. Use an ACP-compatible client to interact with the ACP server.
-
-Deferred interoperability and UX work is tracked in [TODO.md](../TODO.md).

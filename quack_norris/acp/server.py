@@ -31,7 +31,6 @@ from acp.schema import (
     ListSessionsResponse,
     LoadSessionResponse,
     NewSessionResponse,
-    PermissionOption,
     PromptCapabilities,
     PromptResponse,
     ResumeSessionResponse,
@@ -50,7 +49,9 @@ from acp.schema import (
     ToolKind,
 )
 
+from quack_norris.acp.approval import ApprovalPolicy
 from quack_norris.acp.session import ACPSession, SessionStore
+from quack_norris.acp.title import generate_session_title
 from quack_norris.acp.tools import ACPOperationRegistry, make_acp_tools
 from quack_norris.core import (
     LLM,
@@ -221,18 +222,27 @@ class QuackNorrisACPAgent:
                 await self._emit(session, update_user_message_text(text))
                 core_text = self._expand_skill_command(session, text)
                 session.chat_history.append(UserMessage(content=core_text))
-                if session.title is None:
-                    session.title = " ".join(text.split())[:80] or None
-                    if session.title:
-                        await self._emit(
-                            session,
-                            SessionInfoUpdate(
-                                session_update="session_info_update",
-                                title=session.title,
-                            ),
-                        )
+                needs_title = session.title is None
                 self._store.save(session)
-                await self._run_core(session)
+                assistant_text = await self._run_core(session)
+                if needs_title and not session.cancelled:
+                    title_model = (
+                        session.context_policy.config.summarizer_model
+                        if session.context_policy
+                        else None
+                    ) or session.model
+                    session.title = await generate_session_title(
+                        text,
+                        assistant_text,
+                        title_model,
+                    )
+                    await self._emit(
+                        session,
+                        SessionInfoUpdate(
+                            session_update="session_info_update",
+                            title=session.title,
+                        ),
+                    )
                 self._store.save(session)
                 return PromptResponse(stop_reason="cancelled" if session.cancelled else "end_turn")
             except asyncio.CancelledError:
@@ -406,10 +416,12 @@ class QuackNorrisACPAgent:
                 return
 
         async def on_permission(call: ToolCallOutput) -> bool | ToolResult:
-            options = [
-                PermissionOption(option_id="allow", name="Allow once", kind="allow_once"),
-                PermissionOption(option_id="reject", name="Reject", kind="reject_once"),
-            ]
+            policy = ApprovalPolicy(session.cwd)
+            if call.needs_approval != "human" and policy.is_allowed(
+                call.tool_name, call.arguments
+            ):
+                return True
+            choices = policy.choices(call.tool_name, call.arguments)
             response = await self._require_connection().request_permission(
                 session.session_id,
                 ToolCallUpdate(
@@ -419,13 +431,23 @@ class QuackNorrisACPAgent:
                     status="pending",
                     raw_input=call.arguments,
                 ),
-                options,
+                [choice.option for choice in choices],
             )
             outcome = response.outcome
-            return (
-                getattr(outcome, "outcome", None) == "selected"
-                and getattr(outcome, "option_id", None) == "allow"
+            if getattr(outcome, "outcome", None) != "selected":
+                return False
+            selected = next(
+                (
+                    choice
+                    for choice in choices
+                    if choice.option.option_id == getattr(outcome, "option_id", None)
+                ),
+                None,
             )
+            if selected is None or selected.option.kind.startswith("reject"):
+                return False
+            policy.persist(selected)
+            return True
 
         return await self._agent_fn(
             model=session.model,
@@ -558,6 +580,10 @@ class QuackNorrisACPAgent:
         for operation in registry.take_all():
             with contextlib.suppress(Exception):
                 await connection.kill_terminal(session.session_id, operation.terminal_id)
+            if not operation.wait_task.done():
+                operation.wait_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await operation.wait_task
             with contextlib.suppress(Exception):
                 await connection.release_terminal(session.session_id, operation.terminal_id)
 

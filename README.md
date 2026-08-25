@@ -59,6 +59,9 @@ The ACP server provides:
 - persona selection through ACP session modes and an `agent` config option;
 - model selection through an ACP `model` config option, including dynamic OpenAI-compatible and authenticated Copilot `/models` discovery;
 - skill commands and `/refresh` for live selector/discovery updates;
+- generated session titles with deterministic fallback;
+- project/global persisted approval choices;
+- terminal fast-path completion before deferred operation handles;
 - per-session terminal operation registries.
 
 ACP stdout is protocol-only. Diagnostics use stderr.

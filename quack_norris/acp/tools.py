@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from acp import Client
 from acp.schema import EnvVariable
@@ -18,14 +19,22 @@ class TerminalOperation:
     operation_id: str
     terminal_id: str
     command: str
+    wait_task: asyncio.Task[Any]
 
 
 class ACPOperationRegistry:
     def __init__(self) -> None:
         self._operations: dict[str, TerminalOperation] = {}
 
-    def add(self, terminal_id: str, command: str) -> TerminalOperation:
-        operation = TerminalOperation(f"op-{uuid.uuid4().hex[:8]}", terminal_id, command)
+    def add(
+        self,
+        terminal_id: str,
+        command: str,
+        wait_task: asyncio.Task[Any],
+    ) -> TerminalOperation:
+        operation = TerminalOperation(
+            f"op-{uuid.uuid4().hex[:8]}", terminal_id, command, wait_task
+        )
         self._operations[operation.operation_id] = operation
         return operation
 
@@ -54,6 +63,7 @@ def make_acp_tools(
     can_write: bool,
     can_use_terminal: bool,
     registry: ACPOperationRegistry,
+    defer_threshold_seconds: float = 30.0,
 ) -> list[Tool]:
     tools: list[Tool] = []
     roots = (cwd.resolve(), *(path.resolve() for path in additional_directories))
@@ -132,6 +142,9 @@ def make_acp_tools(
 
     if can_use_terminal:
         async def _start_shell(command: str) -> ToolResult:
+            terminal_id: str | None = None
+            wait_task: asyncio.Task[Any] | None = None
+            deferred = False
             try:
                 executable, args = _shell_command(command)
                 response = await connection.create_terminal(
@@ -140,7 +153,31 @@ def make_acp_tools(
                     args=args,
                     cwd=str(cwd),
                 )
-                operation = registry.add(response.terminal_id, command)
+                terminal_id = response.terminal_id
+                wait_task = asyncio.create_task(
+                    connection.wait_for_terminal_exit(session_id, terminal_id)
+                )
+                done, _ = await asyncio.wait(
+                    {wait_task},
+                    timeout=max(0.0, defer_threshold_seconds),
+                )
+                if done:
+                    status = wait_task.result()
+                    output = await connection.terminal_output(session_id, terminal_id)
+                    content = output.output or "(no output)"
+                    if output.truncated:
+                        content += "\n[output truncated]"
+                    await connection.release_terminal(session_id, terminal_id)
+                    terminal_id = None
+                    return ToolResult(
+                        content=content,
+                        is_error=(
+                            status.exit_code not in (None, 0)
+                            or status.signal is not None
+                        ),
+                    )
+                operation = registry.add(terminal_id, command, wait_task)
+                deferred = True
                 return ToolResult(
                     content=(
                         f"Operation started: {operation.operation_id}. "
@@ -149,6 +186,14 @@ def make_acp_tools(
                 )
             except Exception as exc:  # noqa: BLE001
                 return ToolResult(content=str(exc), is_error=True)
+            finally:
+                if terminal_id is not None and not deferred:
+                    if wait_task is not None and not wait_task.done():
+                        wait_task.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await wait_task
+                    with contextlib.suppress(Exception):
+                        await connection.release_terminal(session_id, terminal_id)
 
         if sys.platform == "win32":
             @tool(needs_approval=True, show_output=True)
@@ -176,7 +221,11 @@ def make_acp_tools(
                 return _unknown_operation(handle, registry)
             try:
                 response = await connection.terminal_output(session_id, operation.terminal_id)
-                status = "finished" if response.exit_status is not None else "running"
+                status = (
+                    "finished"
+                    if response.exit_status is not None or operation.wait_task.done()
+                    else "running"
+                )
                 content = f"Operation {handle} is {status}."
                 if response.output:
                     content += f"\n{response.output}"
@@ -194,7 +243,7 @@ def make_acp_tools(
             if operation is None:
                 return _unknown_operation(handle, registry)
             try:
-                status = await connection.wait_for_terminal_exit(session_id, operation.terminal_id)
+                status = await operation.wait_task
                 output = await connection.terminal_output(session_id, operation.terminal_id)
                 content = output.output or "(no output)"
                 if output.truncated:
@@ -220,6 +269,10 @@ def make_acp_tools(
             except Exception as exc:  # noqa: BLE001
                 return ToolResult(content=str(exc), is_error=True)
             finally:
+                if not operation.wait_task.done():
+                    operation.wait_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await operation.wait_task
                 with contextlib.suppress(Exception):
                     await connection.release_terminal(session_id, operation.terminal_id)
                 registry.release(handle)

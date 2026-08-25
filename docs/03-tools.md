@@ -30,7 +30,7 @@ tools = [
 ]
 ```
 
-The core never adds poll/await/kill automatically. Hosts may omit or replace them.
+The core never adds poll/await/kill automatically. Hosts may omit or replace them. Native and ACP terminal commands are awaited for up to 30 seconds: commands that finish within the window return output directly and release the process/terminal, while only slower commands return an operation handle. The result returns immediately when the command exits; it does not always wait 30 seconds.
 
 ## ACP tools
 

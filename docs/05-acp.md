@@ -55,7 +55,7 @@ $QUACK_NORRIS_HOME/sessions/<32-character-session-id>/
 ```
 
 - Session IDs are validated before any path access.
-- The first non-command prompt becomes a compact session title and is emitted through ACP `SessionInfoUpdate`.
+- After the first completed turn, a short title is generated with the configured summarizer model or session model, cleaned, persisted, and emitted through ACP `SessionInfoUpdate`; a prompt excerpt is used as fallback.
 - Metadata/history writes use temporary-file replacement.
 - `session/load` restores core history, rebuilds capability-dependent tools, and replays saved ACP updates before returning.
 - Active terminal handles are not persisted across process restarts.
@@ -77,6 +77,10 @@ Model-driven skill use remains available through `use_skill`.
 The ACP server builds the exact tool list from negotiated client capabilities. The shell tool is named `pwsh` on Windows and `bash` elsewhere. Tool-call titles include the command (for example, `pwsh: echo "hello world"`), and file writes/replacements publish ACP diff content for supporting clients. It maintains a per-session operation registry that maps Quack operation IDs to ACP terminal IDs and guarantees terminal release on await, kill, cancellation, and file-operation completion.
 
 Permission-required core tool calls are translated to ACP `request_permission` options. Unsupported capabilities result in omitted tools rather than local fallback behavior.
+
+## Approval persistence
+
+Permission requests offer allow once, project/global exact rules, project/global command-family rules for shell tools, and reject once. Project rules are stored in `<cwd>/.quack-whitelist.yaml`; global rules are stored in `$QUACK_NORRIS_HOME/whitelist.yaml`. Persisted approval never bypasses workspace/path validation.
 
 ## Provider configuration
 

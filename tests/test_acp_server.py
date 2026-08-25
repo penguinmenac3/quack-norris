@@ -45,6 +45,11 @@ def configured_llm():
         ),
         patch("quack_norris.acp.server.LLM.context_config", return_value=ContextManagementConfig()),
         patch("quack_norris.acp.server.LLM.get_context_window", return_value=128_000),
+        patch(
+            "quack_norris.acp.server.generate_session_title",
+            new_callable=AsyncMock,
+            return_value="Generated title",
+        ),
     ):
         yield
 
@@ -103,10 +108,10 @@ async def test_new_prompt_list_and_load_replay(tmp_path, monkeypatch, configured
         for _, update in connection.updates
         if update.session_update == "session_info_update"
     ]
-    assert title_updates[-1].title == "Hello"
+    assert title_updates[-1].title == "Generated title"
     listed = await server.list_sessions(str(project))
     assert [item.session_id for item in listed.sessions] == [created.session_id]
-    assert listed.sessions[0].title == "Hello"
+    assert listed.sessions[0].title == "Generated title"
 
     replay_connection = RecordingConnection()
     restarted = QuackNorrisACPAgent(store=SessionStore(), agent_fn=scripted_agent)
@@ -126,7 +131,7 @@ async def test_new_prompt_list_and_load_replay(tmp_path, monkeypatch, configured
         update.title
         for _, update in replay_connection.updates
         if update.session_update == "session_info_update"
-    ][-1] == "Hello"
+    ][-1] == "Generated title"
 
 
 @pytest.mark.asyncio
