@@ -86,6 +86,11 @@ _DEFAULT_PROMPT = (
 _REFRESH_COMMAND = AvailableCommand(
     name="refresh",
     description="Refresh models, agents, skills, and tools",
+    input=AvailableCommandInput(
+        root=UnstructuredCommandInput(
+            hint="Refresh agent configuration and discovered resources"
+        )
+    ),
 )
 
 

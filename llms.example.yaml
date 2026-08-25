@@ -52,11 +52,13 @@ llms:
 
   # GitHub Copilot — public github.com (device-flow login on first use;
   # token cached in ~/.config/quack-norris/copilot_token).
+  # Trigger login via `quack-norris login-copilot`
   - group: copilot
     provider: GitHubCopilot
 
   # GitHub Enterprise Copilot — supply the GHE base URL; the Copilot API URL
   # and auth domain are derived automatically.
+  # Trigger login via `quack-norris login-copilot --enterprise-domain https://your-company.ghe.com/`
   # - group: copilot
   #   provider: GitHubCopilot
   #   api_endpoint: https://your-company.ghe.com/
