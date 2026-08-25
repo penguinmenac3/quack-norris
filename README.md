@@ -6,14 +6,6 @@
 
 Quack Norris is a **compact agent core optimized for small language models (SLMs)**. It can be  integrated as an **Agent Client Protocol (ACP) agent** into other agents or UIs or used for custom code as a **Python SDK**.
 
-```mermaid
-flowchart LR
-    SDK[Python SDK] --> Core[`agent(...)<br/>+ tools<br/>+ skills`]
-    Client[`ACP client<br/>(e.g zed)`] --> Server[ACP Server<br/>`quack-norris acp`]
-    Server --> Core
-    Core --> LLM[LLM providers<br/>+ openai<br/>+ ollama<br/>+ aws bedrock]
-```
-
 ## ACP Agent
 
 Quack Norris works with any ACP-compatible client.
