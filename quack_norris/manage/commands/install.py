@@ -17,7 +17,7 @@ from ..paths import (
     skill_install_dir,
     tool_agent_dirs,
 )
-from ..sources import all_sources
+from ..sources import SourceEntry, all_source_entries, all_sources
 from .update import sync_sources
 
 _TOOL_FLAGS = ["quack-norris", "copilot", "claude", "windsurf", "continue"]
@@ -391,7 +391,11 @@ def cmd_install(args: argparse.Namespace) -> None:
             if not ok:
                 print(f"  ✗ {msg}", file=sys.stderr)
 
-    all_items = scan_all(source_urls) if source_urls else []
+    if explicit_source:
+        source_entries = [SourceEntry(url=explicit_source)]
+    else:
+        source_entries = all_source_entries(global_agents_dir(), project_root)
+    all_items = scan_all(source_entries) if source_entries else []
 
     targets: list[str] = args.target
     errors = 0

@@ -7,7 +7,7 @@ import sys
 
 from ..cache import fetch
 from ..paths import find_project_root, global_agents_dir
-from ..sources import add_source, all_sources, load_sources, remove_source
+from ..sources import add_source, all_source_entries, remove_source
 
 
 def _fetch(url: str) -> None:
@@ -22,32 +22,35 @@ def _fetch(url: str) -> None:
 def cmd_source_add(args: argparse.Namespace) -> None:
     urls: list[str] = args.url
     scope: str = args.scope  # "global" or "project"
+    agents_dir_override: str | None = args.agents_dir
+    skills_dir_override: str | None = args.skills_dir
+
+    def _report(result: str, url: str, label: str) -> None:
+        if result == "added":
+            print(f"Added source to {label} sources: {url}")
+            _fetch(url)
+        elif result == "updated":
+            print(f"Updated source overrides in {label} sources: {url}")
+        else:
+            print(f"Source already in {label} sources: {url}")
 
     if scope == "global":
         agents_dir = global_agents_dir()
         for url in urls:
-            added = add_source(agents_dir, url)
-            if added:
-                print(f"Added source to global sources: {url}")
-                _fetch(url)
-            else:
-                print(f"Source already in global sources: {url}")
+            result = add_source(agents_dir, url, agents_dir_override, skills_dir_override)
+            _report(result, url, "global")
     else:
         project_root = find_project_root()
         if project_root is None:
             print(
-                "error: no project root found. Use --global to add to global sources.",
+                "error: no project root found. Use --local from within a project.",
                 file=sys.stderr,
             )
             sys.exit(1)
         agents_dir = project_root / ".agents"
         for url in urls:
-            added = add_source(agents_dir, url)
-            if added:
-                print(f"Added source to project sources ({project_root}): {url}")
-                _fetch(url)
-            else:
-                print(f"Source already in project sources: {url}")
+            result = add_source(agents_dir, url, agents_dir_override, skills_dir_override)
+            _report(result, url, f"project ({project_root})")
 
 
 def cmd_source_remove(args: argparse.Namespace) -> None:
@@ -89,9 +92,15 @@ def cmd_source_remove(args: argparse.Namespace) -> None:
 
 def cmd_source_list(args: argparse.Namespace) -> None:
     project_root = find_project_root()
-    sources = all_sources(global_agents_dir(), project_root)
-    if not sources:
+    entries = all_source_entries(global_agents_dir(), project_root)
+    if not entries:
         print("No sources registered. Use `quack-norris-manage source add <url>` to add one.")
         return
-    for url in sources:
-        print(url)
+    for entry in entries:
+        overrides = []
+        if entry.agents_dir:
+            overrides.append(f"agents-dir: {entry.agents_dir}")
+        if entry.skills_dir:
+            overrides.append(f"skills-dir: {entry.skills_dir}")
+        suffix = f"  ({', '.join(overrides)})" if overrides else ""
+        print(f"{entry.url}{suffix}")

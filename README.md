@@ -154,10 +154,15 @@ Well-known IDE files are also discovered automatically: `.github/copilot-instruc
 `quack-norris-manage` installs, upgrades, and removes agents and skills from git sources.
 
 ```bash
-# Register a source repository
+# Register a source repository (global by default: ~/.agents/sources.yaml)
 quack-norris-manage source add https://github.com/my-org/my-agents.git
-quack-norris-manage source add https://github.com/my-org/my-agents.git --global
+quack-norris-manage source add https://github.com/my-org/my-agents.git --local
 quack-norris-manage source list
+
+# Register a source whose agents/skills live in a hidden directory that
+# isn't auto-detected (auto-detection skips dot-prefixed directories)
+quack-norris-manage source add https://github.com/my-org/my-agents.git \
+  --skills-dir .agents/skills --agents-dir .agents/agents
 
 # List available items (scans all registered sources)
 quack-norris-manage list
@@ -181,6 +186,8 @@ quack-norris-manage uninstall concise-writer
 ```
 
 Scope flags `--global` / `--local` control whether items are installed to `~/.agents/` (global, shared across projects) or `<cwd>/.agents/` (project-local). Install also accepts IDE flags (`--quack-norris`, `--copilot`, `--claude`, `--windsurf`, `--continue`) to copy agent files into IDE-specific locations.
+
+`source add` registers to the global source list by default; pass `--local` to register it for the current project only. `--agents-dir` / `--skills-dir` let you point at a specific path inside the repo for agents/skills that auto-detection would otherwise miss (auto-detection skips dot-prefixed directories such as `.agents/`).
 
 ## Sandbox (`quack-norris-sandbox`)
 

@@ -7,7 +7,7 @@ import argparse
 from ..discovery import DiscoveredItem, scan_all
 from ..manifest import InstalledItem, load_manifest
 from ..paths import find_project_root, global_agents_dir, resolve_install_root
-from ..sources import all_sources
+from ..sources import all_source_entries
 from .update import sync_sources
 
 
@@ -111,7 +111,7 @@ def cmd_list(args: argparse.Namespace) -> None:
     sync_sources()
 
     project_root = find_project_root()
-    sources = all_sources(global_agents_dir(), project_root)
+    sources = all_source_entries(global_agents_dir(), project_root)
     all_items = scan_all(sources)
 
     skills = [i for i in all_items if i.type == "skill"]

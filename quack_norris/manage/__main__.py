@@ -49,26 +49,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     src_add = source_sub.add_parser("add", help="Register a git source URL.")
     src_add.add_argument("url", nargs="+", help="One or more git repository URLs.")
-    src_add_scope = src_add.add_mutually_exclusive_group()
-    src_add_scope.add_argument(
-        "--global",
+    src_add.add_argument(
+        "--local",
         dest="scope",
         action="store_const",
-        const="global",
-        default="project",
-        help="Add to global sources (~/.agents/sources.yaml).",
+        const="project",
+        default="global",
+        help="Add to project sources (<cwd>/.agents/sources.yaml) instead of global.",
+    )
+    src_add.add_argument(
+        "--agents-dir",
+        metavar="DIR",
+        default=None,
+        help="Explicit path (relative to repo root) where this source's agents live, "
+        "e.g. '.agents/agents'. Use when agents are not auto-detected (e.g. inside a hidden directory).",
+    )
+    src_add.add_argument(
+        "--skills-dir",
+        metavar="DIR",
+        default=None,
+        help="Explicit path (relative to repo root) where this source's skills live, "
+        "e.g. '.agents/skills'. Use when skills are not auto-detected (e.g. inside a hidden directory).",
     )
 
     src_remove = source_sub.add_parser("remove", help="Remove a registered source URL.")
     src_remove.add_argument("url", nargs="+", help="One or more git repository URLs.")
-    src_remove_scope = src_remove.add_mutually_exclusive_group()
-    src_remove_scope.add_argument(
-        "--global",
+    src_remove.add_argument(
+        "--local",
         dest="scope",
         action="store_const",
-        const="global",
-        default="project",
-        help="Remove from global sources.",
+        const="project",
+        default="global",
+        help="Remove from project sources instead of global.",
     )
 
     source_sub.add_parser("list", help="List all registered source URLs.")
