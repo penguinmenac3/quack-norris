@@ -66,11 +66,10 @@ The server advertises:
 
 | Command | Purpose |
 |---|---|
-| `/skills` | List discovered skills |
-| `/skill <name> [task]` | Apply a skill as explicit context for one turn |
-| `/refresh` | Reload LLM configuration, dynamic models, personas, skills, and tools |
+| `/refresh` | Reload LLM configuration, dynamic models, personas, skills, tools, and command completions |
+| `/<skill-name> [task]` | Apply that discovered skill as explicit context for one turn |
 
-Model-driven skill use remains available through `use_skill`.
+`/refresh` is always the first advertised command. Every discovered skill except the reserved name `refresh` is advertised after it with the skill description and an optional-task input hint, allowing ACP clients to render completion help. Model-driven skill use remains available through `use_skill`.
 
 ## Client-backed tools
 

@@ -142,10 +142,13 @@ async def test_agent_config_and_skill_command_do_not_call_model(
     project = tmp_path / "project"
     agent_dir = project / ".agents" / "agents"
     skill_dir = project / ".agents" / "skills" / "testing"
+    refresh_skill_dir = project / ".agents" / "skills" / "refresh"
     agent_dir.mkdir(parents=True)
     skill_dir.mkdir(parents=True)
+    refresh_skill_dir.mkdir(parents=True)
     (agent_dir / "reviewer.agent.md").write_text("Review carefully.", encoding="utf-8")
     (skill_dir / "SKILL.md").write_text("Use tests.", encoding="utf-8")
+    (refresh_skill_dir / "SKILL.md").write_text("Reserved name.", encoding="utf-8")
 
     calls = 0
 
@@ -166,23 +169,35 @@ async def test_agent_config_and_skill_command_do_not_call_model(
     config_options = {option.id: option for option in created.config_options}
     assert "reviewer" in [option.value for option in config_options["agent"].options]
 
+    command_update = next(
+        update
+        for _, update in connection.updates
+        if update.session_update == "available_commands_update"
+    )
+    command_names = [command.name for command in command_update.available_commands]
+    assert command_names[0] == "refresh"
+    assert command_names.count("refresh") == 1
+    testing_command = next(
+        command for command in command_update.available_commands if command.name == "testing"
+    )
+    assert testing_command.description == "Use tests."
+    assert testing_command.input.root.hint.startswith("Optional task")
+
     await server.set_config_option("agent", created.session_id, "reviewer")
-    await server.prompt(created.session_id, [text_block("/skills")])
+    await server.prompt(created.session_id, [text_block("/testing Run the suite")])
     with patch("quack_norris.acp.server.LLM.reload") as reload_config:
         await server.prompt(created.session_id, [text_block("/refresh")])
     await server.set_config_option("model", created.session_id, "other/model")
 
     reload_config.assert_called_once_with()
 
-    assert calls == 0
-    assert server._sessions[created.session_id].selected_agent == "reviewer"
-    assert server._sessions[created.session_id].model == "other/model"
-    messages = [
-        update.content.text
-        for _, update in connection.updates
-        if update.session_update == "agent_message_chunk"
-    ]
-    assert any("testing" in message for message in messages)
+    session = server._sessions[created.session_id]
+    assert calls == 1
+    assert session.selected_agent == "reviewer"
+    assert session.model == "other/model"
+    assert "Run the suite" in session.chat_history[0].content
+    assert "[User-invoked skill: testing]" in session.chat_history[0].content
+    assert "Use tests." in session.chat_history[0].content
 
 
 @pytest.mark.asyncio

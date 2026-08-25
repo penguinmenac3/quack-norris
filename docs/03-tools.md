@@ -18,6 +18,8 @@
 
 File-tool factories receive the current workspace and an optional auto-approved scratch root. They do not depend on ACP or session storage.
 
+For normal SDK use, `make_native_tools(workspace, skills=bool(skills))` creates file, platform shell, and operation tools, plus `use_skill` when requested. Skill discovery remains caller-owned.
+
 ## Explicit operation tools
 
 Operation tools are injected explicitly:

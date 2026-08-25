@@ -22,6 +22,7 @@ from acp.helpers import update_available_commands, update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AvailableCommand,
+    AvailableCommandInput,
     ClientCapabilities,
     CloseSessionResponse,
     ConfigOptionUpdate,
@@ -47,6 +48,7 @@ from acp.schema import (
     TextContentBlock,
     ToolCallUpdate,
     ToolKind,
+    UnstructuredCommandInput,
 )
 
 from quack_norris.acp.approval import ApprovalPolicy
@@ -71,7 +73,6 @@ from quack_norris.core.llm import ToolResult, UserMessage
 from quack_norris.skills_and_agents import (
     discover_agents,
     discover_skill_info,
-    discover_skills,
     load_agent_system_prompt,
     load_skill_content,
     make_skill_invoke_tool,
@@ -82,11 +83,10 @@ _DEFAULT_PROMPT = (
     "You are Quack Norris, a concise coding agent. Use the available tools to inspect and "
     "modify the workspace. Validate your work before reporting completion."
 )
-_COMMANDS = [
-    AvailableCommand(name="skills", description="List available skills"),
-    AvailableCommand(name="skill", description="Invoke a skill for this turn"),
-    AvailableCommand(name="refresh", description="Refresh agent and skill discovery"),
-]
+_REFRESH_COMMAND = AvailableCommand(
+    name="refresh",
+    description="Refresh models, agents, skills, and tools",
+)
 
 
 class QuackNorrisACPAgent:
@@ -461,12 +461,7 @@ class QuackNorrisACPAgent:
         )
 
     async def _handle_command(self, session: ACPSession, text: str) -> bool:
-        command, _, argument = text.strip().partition(" ")
-        if command == "/skills":
-            names = discover_skills(session.cwd)
-            content = "Available skills:\n" + "\n".join(names) if names else "No skills found."
-            await self._emit(session, update_agent_message_text(content))
-            return True
+        command = text.strip().partition(" ")[0]
         if command == "/refresh":
             LLM.reload()
             await LLM.refresh_available_models(force=True)
@@ -487,17 +482,37 @@ class QuackNorrisACPAgent:
         return False
 
     def _expand_skill_command(self, session: ACPSession, text: str) -> str:
-        command, _, argument = text.strip().partition(" ")
-        if command != "/skill":
+        command, _, task = text.strip().partition(" ")
+        if not command.startswith("/") or command == "/refresh":
             return text
-        name, _, task = argument.partition(" ")
+        name = command[1:]
+        if name not in {skill.name for skill in session.skills}:
+            return text
         content = load_skill_content(name, session.cwd)
         if content is None:
             return f"The requested skill '{name}' was not found. {task}".strip()
         return f"{task}\n\n[User-invoked skill: {name}]\n{content}".strip()
 
+    @staticmethod
+    def _available_commands(session: ACPSession) -> list[AvailableCommand]:
+        commands = [_REFRESH_COMMAND]
+        commands.extend(
+            AvailableCommand(
+                name=skill.name,
+                description=skill.description or f"Invoke the {skill.name} skill",
+                input=AvailableCommandInput(
+                    root=UnstructuredCommandInput(
+                        hint="Optional task or additional instructions"
+                    )
+                ),
+            )
+            for skill in session.skills
+            if skill.name != "refresh"
+        )
+        return commands
+
     async def _emit_commands(self, session: ACPSession, *, persist: bool = False) -> None:
-        update = update_available_commands(_COMMANDS)
+        update = update_available_commands(self._available_commands(session))
         await self._require_connection().session_update(session.session_id, update)
         if persist:
             self._store.append_update(session.session_id, update)
