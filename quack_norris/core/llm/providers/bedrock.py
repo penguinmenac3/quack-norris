@@ -98,13 +98,15 @@ class BedrockProvider:
         chat_history: list[ChatMessage],
     ) -> AsyncIterator[LLMOutput]:
         system_str, bedrock_messages = _encode_messages(system_prompt, chat_history)
+        system_content = [{"text": system_str}] if system_str else []
+        _add_prompt_cache_points(system_content, bedrock_messages)
 
         kwargs: dict[str, Any] = {
             "modelId": model_name,
             "messages": bedrock_messages,
         }
-        if system_str:
-            kwargs["system"] = [{"text": system_str}]
+        if system_content:
+            kwargs["system"] = system_content
         if tools:
             kwargs["toolConfig"] = {"tools": _encode_tools(tools)}
 
@@ -237,6 +239,24 @@ def _encode_messages(
             bedrock_msgs.append({"role": msg.role, "content": content})
 
     return system_prompt, bedrock_msgs
+
+
+def _add_prompt_cache_points(
+    system: list[dict[str, Any]], messages: list[dict[str, Any]],
+) -> None:
+    """Place system and rolling conversation cache points in valid Bedrock blocks."""
+    for content in [system, *(message["content"] for message in messages)]:
+        content[:] = [block for block in content if "cachePoint" not in block]
+
+    if system:
+        system.append({"cachePoint": {"type": "default"}})
+
+    # Cache through the latest user content. This remains outside toolResult and
+    # replacing all existing markers keeps the request below Bedrock's limit.
+    for message in reversed(messages):
+        if message["role"] == "user":
+            message["content"].append({"cachePoint": {"type": "default"}})
+            break
 
 
 def _encode_tools(tools: list[ToolDefinition]) -> list[dict[str, Any]]:
