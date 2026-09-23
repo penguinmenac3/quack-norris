@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from quack_norris.core.llm import LLM
+from quack_norris.core.llm.config import LLMConfig
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +135,23 @@ async def test_refresh_available_models_discovers_dynamic_provider_models() -> N
 
 
 @pytest.mark.asyncio
+async def test_refresh_available_models_refreshes_static_metadata() -> None:
+    class MetadataProvider:
+        def __init__(self) -> None:
+            self.models: list[str] = []
+
+        async def refresh_model_metadata(self, model_names: list[str]) -> None:
+            self.models = model_names
+
+    provider = MetadataProvider()
+    LLM._groups = {"ollama": [(provider, ["quack-qwen"])]}
+
+    await LLM.refresh_available_models()
+
+    assert provider.models == ["quack-qwen"]
+
+
+@pytest.mark.asyncio
 async def test_converse_unknown_group(tmp_path: Path) -> None:
     _yaml(tmp_path, "llms:\n  - group: ollama\n    api_endpoint: http://x\n")
     LLM.setup(tmp_path / "llms.yaml")
@@ -142,6 +160,19 @@ async def test_converse_unknown_group(tmp_path: Path) -> None:
         stream = await LLM.converse("openai/gpt-4o", "sys", [], [])
         async for _ in stream:
             pass
+
+
+def test_get_provider_discovered_context_window() -> None:
+    class MetadataProvider:
+        def context_window(self, model_name: str) -> int | None:
+            return 8192 if model_name == "quack-qwen" else None
+
+    provider = MetadataProvider()
+    LLM._groups = {"ollama": [(provider, ["quack-qwen"])]}
+    LLM._model_map = {"ollama/quack-qwen": provider}
+    LLM._configs = [LLMConfig(group="ollama", api_endpoint="", context_window=4096)]
+
+    assert LLM.get_context_window("ollama/quack-qwen") == 8192
 
 
 def test_get_context_window(tmp_path: Path) -> None:

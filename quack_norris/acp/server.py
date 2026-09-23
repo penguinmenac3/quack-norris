@@ -150,6 +150,7 @@ class QuackNorrisACPAgent:
         self._configure_session(session)
         self._sessions[session.session_id] = session
         await LLM.refresh_available_models()
+        self._configure_context(session)
         await self._emit_commands(session)
         return NewSessionResponse(
             session_id=session.session_id,
@@ -175,6 +176,7 @@ class QuackNorrisACPAgent:
         self._configure_session(session)
         self._sessions[session_id] = session
         await LLM.refresh_available_models()
+        self._configure_context(session)
         for update in self._store.read_updates(session_id):
             await self._require_connection().session_update(session_id, update)
         if session.title:
@@ -372,9 +374,12 @@ class QuackNorrisACPAgent:
             registry=registry,
         )
         session.tools.append(make_skill_invoke_tool(project_root))
-        config = LLM.context_config()
+        self._configure_context(session)
+
+    @staticmethod
+    def _configure_context(session: ACPSession) -> None:
         session.context_policy = ContextPolicy(
-            config=config,
+            config=LLM.context_config(),
             context_window=LLM.get_context_window(session.model),
         )
 

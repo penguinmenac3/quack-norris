@@ -82,6 +82,19 @@ def test_multiple_groups(tmp_path: Path) -> None:
     assert [c.group for c in configs] == ["ollama", "openai"]
 
 
+def test_ollama_defaults_to_safe_context_window(tmp_path: Path) -> None:
+    p = _write(
+        tmp_path,
+        """
+        llms:
+          - group: ollama
+            provider: Ollama
+            api_endpoint: http://localhost:11434
+        """,
+    )
+    assert load_llm_configs(p)[0].context_window == 4096
+
+
 def test_provider_types(tmp_path: Path) -> None:
     p = _write(
         tmp_path,

@@ -17,9 +17,8 @@ Format::
 
     llms:
       - group: ollama
-        provider: OpenAI          # OpenAI | AzureOpenAI | AWSBedrock
-        api_endpoint: http://localhost:11434/v1
-        api_key: ollama           # optional; supports $ENV_VAR expansion
+        provider: Ollama          # Ollama | OpenAI | AzureOpenAI | AWSBedrock
+        api_endpoint: http://localhost:11434
         models:                   # optional static list; omit for dynamic
           - qwen3:14b
 
@@ -213,7 +212,9 @@ def parse_llm_configs(raw: dict[str, Any]) -> list[LLMConfig]:
                 api_version=cfg.get("api_version"),
                 region=cfg.get("region"),
                 models=cfg.get("models"),
-                context_window=cfg.get("context_window", 128_000),
+                context_window=cfg.get(
+                    "context_window", 4096 if cfg.get("provider") == "Ollama" else 128_000
+                ),
             )
         )
     return configs

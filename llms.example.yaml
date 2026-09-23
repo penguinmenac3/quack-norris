@@ -20,10 +20,8 @@ context_management:
 
 llms:
   - group: ollama
-    provider: OpenAI
-    api_endpoint: http://localhost:11434/v1
-    api_key: ollama
-    context_window: 4096  # default ollama limit is 4096
+    provider: Ollama
+    api_endpoint: http://localhost:11434
 
   - group: openai
     provider: OpenAI

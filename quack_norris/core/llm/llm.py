@@ -29,6 +29,7 @@ from quack_norris.core.llm.providers import (
     AzureOpenAIProvider,
     BedrockProvider,
     CopilotProvider,
+    OllamaProvider,
     OpenAIProvider,
 )
 from quack_norris.core.llm.tool import Tool, ToolCallRequest, ToolResult
@@ -55,7 +56,7 @@ def _load_global_raw() -> dict[str, Any]:
 
 
 # Type alias for any provider instance
-_AnyProvider = OpenAIProvider | BedrockProvider | CopilotProvider
+_AnyProvider = OpenAIProvider | BedrockProvider | CopilotProvider | OllamaProvider
 
 
 def _tool_definition(t: Tool) -> ToolDefinition:
@@ -104,6 +105,8 @@ def _build_provider(cfg: LLMConfig) -> _AnyProvider:
         # (e.g. https://your-company.ghe.com/); the provider derives
         # the Copilot API URL and auth domain automatically.
         return CopilotProvider(api_endpoint=cfg.api_endpoint or None)
+    if cfg.provider == "Ollama":
+        return OllamaProvider(base_url=cfg.api_endpoint or "http://localhost:11434")
     # Default: OpenAI-compatible
     return OpenAIProvider(base_url=cfg.api_endpoint, api_key=cfg.api_key)
 
@@ -339,20 +342,28 @@ class LLM:
         discovered: set[str] = set()
         for group, providers in cls._groups.items():
             for provider, static_models in providers:
-                if static_models is not None:
-                    continue
-                list_models = getattr(provider, "list_models", None)
-                if list_models is None:
-                    continue
-                try:
-                    models = list_models()
-                    if inspect.isawaitable(models):
-                        models = await asyncio.wait_for(models, timeout=5.0)
-                    discovered.update(
-                        f"{group}/{model}" for model in cast(list[str], models)
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    _log.warning("Could not discover models for group '%s': %s", group, exc)
+                models = static_models
+                if models is None:
+                    list_models = getattr(provider, "list_models", None)
+                    if list_models is None:
+                        continue
+                    try:
+                        result = list_models()
+                        if inspect.isawaitable(result):
+                            result = await asyncio.wait_for(result, timeout=5.0)
+                        models = cast(list[str], result)
+                        discovered.update(f"{group}/{model}" for model in models)
+                    except Exception as exc:  # noqa: BLE001
+                        _log.warning("Could not discover models for group '%s': %s", group, exc)
+                        continue
+                refresh_metadata = getattr(provider, "refresh_model_metadata", None)
+                if refresh_metadata is not None:
+                    try:
+                        result = refresh_metadata(models)
+                        if inspect.isawaitable(result):
+                            await result
+                    except Exception as exc:  # noqa: BLE001
+                        _log.warning("Could not discover metadata for group '%s': %s", group, exc)
         cls._discovered_models = discovered
         cls._models_refreshed = True
         return cls.available_models()
@@ -379,7 +390,16 @@ class LLM:
     def get_context_window(cls, prefixed_model: str) -> int:
         """Return context window size (tokens) for a model's group."""
         if "/" in prefixed_model:
-            group = prefixed_model.split("/", 1)[0]
+            group, model = prefixed_model.split("/", 1)
+            try:
+                provider, _ = cls._resolve(prefixed_model)
+            except ValueError:
+                provider = None
+            provider_context = getattr(provider, "context_window", None)
+            if provider_context is not None:
+                discovered = provider_context(model)
+                if isinstance(discovered, int) and discovered > 0:
+                    return discovered
             for cfg in cls._configs:
                 if cfg.group == group:
                     return cfg.context_window

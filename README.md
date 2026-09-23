@@ -84,13 +84,11 @@ defaults:
 
 llms:
   - group: ollama
-    provider: OpenAI
-    api_endpoint: http://localhost:11434/v1
-    api_key: ollama
-    context_window: 32768
+    provider: Ollama
+    api_endpoint: http://localhost:11434
 ```
 
-Supported providers include OpenAI-compatible endpoints, Ollama, Azure OpenAI, AWS Bedrock, and GitHub Copilot. Static model lists can be configured with `models:`; dynamic OpenAI-compatible and authenticated Copilot providers are discovered through their `/models` endpoints.
+The Ollama provider discovers each model's context length through `/api/show`, so context compaction can use the model's configured runtime window without duplicating it here. Supported providers include OpenAI-compatible endpoints, Ollama, Azure OpenAI, AWS Bedrock, and GitHub Copilot. Static model lists can be configured with `models:`; dynamic OpenAI-compatible and authenticated Copilot providers are discovered through their `/models` endpoints.
 
 ## 🛠️ Tools
 
