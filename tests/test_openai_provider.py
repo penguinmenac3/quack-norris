@@ -49,9 +49,11 @@ def test_translate_server_error_is_retryable() -> None:
 def test_translate_connection_error() -> None:
     request = httpx.Request("POST", "http://localhost/v1/chat/completions")
     exc = openai.APIConnectionError(request=request)
+    exc.__cause__ = httpx.ConnectError("certificate verify failed")
     result = _translate_openai_error(exc, "gpt-4o")
     assert result.retryable is True
     assert result.status_code is None
+    assert "ConnectError: certificate verify failed" in result.message
 
 
 # ---------------------------------------------------------------------------

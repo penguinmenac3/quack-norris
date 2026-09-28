@@ -50,8 +50,10 @@ def _translate_openai_error(exc: openai.OpenAIError, model_name: str) -> LLMAPIE
             retryable=status >= 500,
         )
     if isinstance(exc, (openai.APITimeoutError, openai.APIConnectionError)):
+        cause = exc.__cause__ or exc
         return LLMAPIError(
-            f"Could not reach the API for model '{model_name}': {exc}",
+            f"Could not reach the API for model '{model_name}': "
+            f"{type(cause).__name__}: {cause}",
             retryable=True,
         )
     return LLMAPIError(f"LLM request to '{model_name}' failed: {exc}")

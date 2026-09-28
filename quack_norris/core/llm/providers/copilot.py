@@ -31,7 +31,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2 as httpx
 
 from quack_norris.core.llm.errors import LLMAPIError
 from quack_norris.core.llm.provider import (
