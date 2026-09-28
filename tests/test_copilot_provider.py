@@ -13,9 +13,18 @@ import pytest
 
 from quack_norris.core.llm import LLM
 from quack_norris.core.llm.errors import LLMAPIError
-from quack_norris.core.llm.provider import TextDelta, UsageInfo
+from quack_norris.core.llm.provider import (
+    AssistantMessage,
+    TextDelta,
+    ToolDefinition,
+    ToolParameter,
+    ToolResultMessage,
+    UsageInfo,
+    UserMessage,
+)
 from quack_norris.core.llm.providers.copilot import (
     CopilotProvider,
+    _encode_responses_input,
     _headers,
     _load_token,
     _parse_endpoint,
@@ -226,6 +235,95 @@ async def test_converse_responses_api(provider: CopilotProvider) -> None:
 
     texts = [i.text for i in items if isinstance(i, TextDelta)]
     assert texts == ["I am GPT-5."]
+
+
+@pytest.mark.asyncio
+async def test_responses_api_sends_tools_and_parses_function_call(
+    provider: CopilotProvider,
+) -> None:
+    response_json = {
+        "output": [
+            {
+                "type": "function_call",
+                "call_id": "call-123",
+                "name": "hello_world",
+                "arguments": '{"name":"world"}',
+            },
+        ],
+    }
+    mock_client = MagicMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    _responses_stub(mock_client, response_json)
+    tool = ToolDefinition(
+        name="hello_world",
+        description="Make a greeting",
+        parameters={"name": ToolParameter("string", "Who to greet")},
+        required=["name"],
+    )
+
+    with patch(
+        "quack_norris.core.llm.providers.copilot.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
+        items = [
+            item
+            async for item in provider.converse(
+                "gpt-5.6-luna",
+                "Use tools when requested.",
+                [tool],
+                [UserMessage(content="Say hello")],
+            )
+        ]
+
+    calls = [item for item in items if isinstance(item, ToolCallRequest)]
+    assert len(calls) == 1
+    assert calls[0].id == "call-123"
+    assert calls[0].name == "hello_world"
+    assert calls[0].arguments == {"name": "world"}
+    payload = mock_client.post.await_args.kwargs["json"]
+    assert payload["tools"] == [
+        {
+            "type": "function",
+            "name": "hello_world",
+            "description": "Make a greeting",
+            "parameters": {
+                "type": "object",
+                "properties": {"name": {"type": "string", "description": "Who to greet"}},
+                "required": ["name"],
+            },
+            "strict": False,
+        }
+    ]
+
+
+def test_responses_input_encodes_function_call_roundtrip() -> None:
+    history = [
+        UserMessage(content="Say hello"),
+        AssistantMessage(
+            content="",
+            tool_calls=[
+                ToolCallRequest(
+                    id="call-123",
+                    name="hello_world",
+                    arguments={"name": "world"},
+                )
+            ],
+        ),
+        ToolResultMessage(tool_call_id="call-123", content="Hello, world!"),
+    ]
+
+    assert _encode_responses_input("system", history) == [
+        {"role": "system", "content": "system"},
+        {"role": "user", "content": "Say hello"},
+        {
+            "type": "function_call",
+            "call_id": "call-123",
+            "name": "hello_world",
+            "arguments": '{"name": "world"}',
+        },
+        {"type": "function_call_output", "call_id": "call-123", "output": "Hello, world!"},
+    ]
 
 
 @pytest.mark.asyncio

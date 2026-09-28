@@ -46,32 +46,94 @@ from quack_norris.core.llm.provider import (
 from quack_norris.core.llm.tool import ToolCallRequest
 
 
-def _extract_responses_text(payload: dict[str, Any], model_name: str) -> str:
-    """Pull the assistant's text out of a Responses API payload.
-
-    ``output`` is a list of heterogeneous items — reasoning models (GPT-5+)
-    typically emit a ``reasoning`` item *before* the ``message`` item that
-    actually carries the text, and the ``reasoning`` item has no (or empty)
-    ``content``. Scan for the first ``message`` item instead of assuming
-    ``output[0]`` is it.
-    """
-    output = payload.get("output") or []
-    for item in output:
-        if item.get("type") != "message":
+def _encode_responses_input(
+    system_prompt: str,
+    chat_history: list[ChatMessage],
+) -> list[dict[str, Any]]:
+    """Encode conversation history using Responses API function-call items."""
+    encoded: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+    for message in chat_history:
+        if isinstance(message, ToolResultMessage):
+            encoded.append({
+                "type": "function_call_output",
+                "call_id": message.tool_call_id,
+                "output": message.content,
+            })
             continue
-        parts = item.get("content") or []
-        text = "".join(
-            p.get("text", "") for p in parts if p.get("type") == "output_text"
+
+        if message.content:
+            encoded.append({"role": message.role, "content": message.content})
+        if isinstance(message, AssistantMessage):
+            encoded.extend(
+                {
+                    "type": "function_call",
+                    "call_id": call.id,
+                    "name": call.name,
+                    "arguments": json.dumps(call.arguments),
+                }
+                for call in message.tool_calls
+            )
+    return encoded
+
+
+def _encode_responses_tools(tools: list[ToolDefinition]) -> list[dict[str, Any]]:
+    """Encode function tools in the Responses API schema."""
+    return [
+        {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    name: {
+                        "type": parameter.type,
+                        "description": parameter.description,
+                        **({"enum": parameter.enum} if parameter.enum else {}),
+                    }
+                    for name, parameter in tool.parameters.items()
+                },
+                "required": tool.required,
+            },
+            "strict": False,
+        }
+        for tool in tools
+    ]
+
+
+def _parse_responses_output(
+    payload: dict[str, Any], model_name: str,
+) -> tuple[list[str], list[ToolCallRequest]]:
+    texts: list[str] = []
+    tool_calls: list[ToolCallRequest] = []
+    for item in payload.get("output") or []:
+        if item.get("type") == "message":
+            for part in item.get("content") or []:
+                if part.get("type") == "output_text" and part.get("text"):
+                    texts.append(part["text"])
+                elif part.get("type") == "refusal" and part.get("refusal"):
+                    raise LLMAPIError(
+                        f"Model '{model_name}' refused the request: {part['refusal']}"
+                    )
+        elif item.get("type") == "function_call":
+            raw_arguments = item.get("arguments") or "{}"
+            try:
+                arguments = json.loads(raw_arguments)
+            except (json.JSONDecodeError, TypeError):
+                arguments = {"_raw": raw_arguments}
+            tool_calls.append(
+                ToolCallRequest(
+                    id=item.get("call_id") or item.get("id", ""),
+                    name=item.get("name", ""),
+                    arguments=arguments,
+                )
+            )
+    if not texts and not tool_calls:
+        raise LLMAPIError(
+            f"Copilot Responses API returned no message text or function calls "
+            f"for model '{model_name}' (response: {payload!r})"
         )
-        if text:
-            return text
-        refusal = next((p.get("refusal", "") for p in parts if p.get("type") == "refusal"), "")
-        if refusal:
-            raise LLMAPIError(f"Model '{model_name}' refused the request: {refusal}")
-    raise LLMAPIError(
-        f"Copilot Responses API returned no message text for model '{model_name}' "
-        f"(response: {payload!r})"
-    )
+    return texts, tool_calls
 
 
 def _translate_http_error(exc: Exception, model_name: str) -> LLMAPIError:
@@ -355,7 +417,9 @@ class CopilotProvider:
         token = self._get_token()
 
         if _use_responses_api(model_name):
-            async for item in self._responses_api(token, model_name, system_prompt, chat_history):
+            async for item in self._responses_api(
+                token, model_name, system_prompt, tools, chat_history
+            ):
                 yield item
         else:
             async for item in self._chat_completions(
@@ -457,18 +521,24 @@ class CopilotProvider:
         token: str,
         model_name: str,
         system_prompt: str,
+        tools: list[ToolDefinition],
         chat_history: list[ChatMessage],
     ) -> AsyncIterator[LLMOutput]:
-        messages = _encode_messages(system_prompt, chat_history)
+        payload: dict[str, Any] = {
+            "model": model_name,
+            "input": _encode_responses_input(system_prompt, chat_history),
+        }
+        if tools:
+            payload["tools"] = _encode_responses_tools(tools)
         try:
             async with httpx.AsyncClient(timeout=120) as client:
                 r = await client.post(
                     f"{self._base_url}/responses",
                     headers=_headers(token),
-                    json={"model": model_name, "input": messages},
+                    json=payload,
                 )
                 r.raise_for_status()
-                text = _extract_responses_text(r.json(), model_name)
+                texts, tool_calls = _parse_responses_output(r.json(), model_name)
         except httpx.HTTPError as exc:
             raise _translate_http_error(exc, model_name) from exc
         except LLMAPIError:
@@ -477,5 +547,8 @@ class CopilotProvider:
             raise LLMAPIError(
                 f"Could not parse Copilot Responses API reply for model '{model_name}': {exc}"
             ) from exc
-        yield TextDelta(text=text)
+        for text in texts:
+            yield TextDelta(text=text)
+        for tool_call in tool_calls:
+            yield tool_call
         yield UsageInfo(input_tokens=0, output_tokens=0)
