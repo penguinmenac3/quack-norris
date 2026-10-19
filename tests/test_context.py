@@ -365,6 +365,46 @@ async def test_below_threshold_strips_but_does_not_checkpoint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tool_loop_defers_stripping_below_early_trigger() -> None:
+    history = _history(3)
+    before = [m.content for m in history if isinstance(m, ToolResultMessage)]
+    policy = _policy(window=10_000, verbatim=0.05, checkpoint_at=0.8)
+
+    result = await apply_context_policy(
+        history=history,
+        policy=policy,
+        model="ollama/test",
+        system_prompt="sys",
+        tools=[],
+        new_turn=False,
+    )
+
+    assert result is None
+    assert [m.content for m in history if isinstance(m, ToolResultMessage)] == before
+
+
+@pytest.mark.asyncio
+async def test_tool_loop_strips_at_early_trigger_and_remeasures_before_checkpoint() -> None:
+    history = _history(3)
+    policy = _policy(window=400, verbatim=0.5, checkpoint_at=0.8)
+    assert measure(history, "sys", [], policy.context_window).utilisation >= 0.9 * 0.8
+
+    result = await apply_context_policy(
+        history=history,
+        policy=policy,
+        model="ollama/test",
+        system_prompt="sys",
+        tools=[],
+        new_turn=False,
+    )
+
+    assert result is None
+    outputs = [m.content for m in history if isinstance(m, ToolResultMessage)]
+    assert REDACTION_PLACEHOLDER in outputs
+    assert measure(history, "sys", [], policy.context_window).utilisation < 0.8
+
+
+@pytest.mark.asyncio
 async def test_checkpoint_replaces_the_oldest_messages() -> None:
     history = _wordy_history(8)
     original_len = len(history)

@@ -221,11 +221,11 @@ async def agent(
     on_output:
         Called for every :class:`AgentOutput` item as it arrives.
     context:
-        Context window management policy.  When given, the history is brought
-        back within budget before every LLM call — stale tool output stripped,
-        and the oldest messages summarised into a checkpoint once utilisation
-        gets too high — and oversized tool results are clipped.  When ``None``
-        the history grows unbounded.
+        Context window management policy. When given, old tool output is
+        replaced at new-turn boundaries and, within a turn, when utilisation
+        reaches 90% of the checkpoint trigger. The oldest messages are
+        summarised only if usage remains above that trigger; oversized tool
+        results are also clipped. When ``None`` the history grows unbounded.
     skills:
         Optional compact skill metadata appended to the system prompt.  Full
         instructions remain available through a caller-supplied skill tool.
@@ -243,6 +243,7 @@ async def agent(
         def _get_prompt() -> str:
             return _append_skill_catalog(system_prompt(), skills)
 
+    new_turn = True
     for _iteration in range(_MAX_ITERATIONS):
         # ------------------------------------------------------------------ #
         # Keep the context within budget before spending it                    #
@@ -254,6 +255,7 @@ async def agent(
                 model=model,
                 system_prompt=_get_prompt(),
                 tools=tools,
+                new_turn=new_turn,
             )
             if checkpoint is not None:
                 await on_output(checkpoint)
@@ -267,6 +269,7 @@ async def agent(
             tools=tools,
             chat_history=history,
         )
+        new_turn = False
 
         text_chunks: list[str] = []
         tool_calls: list[ToolCallRequest] = []

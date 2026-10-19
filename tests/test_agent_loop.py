@@ -10,14 +10,26 @@ import pytest
 
 from quack_norris.core.agent import (
     AgentOutput,
+    CheckpointOutput,
     ErrorOutput,
     TextOutput,
     ToolCallOutput,
     agent,
 )
+from quack_norris.core.context import REDACTION_PLACEHOLDER, ContextPolicy
+from quack_norris.core.llm import ContextManagementConfig
 from quack_norris.core.llm.errors import LLMAPIError
-from quack_norris.core.llm.provider import TextDelta, UserMessage
-from quack_norris.core.llm.tool import Tool, ToolCallRequest, ToolResult
+from quack_norris.core.llm.provider import (
+    AssistantMessage,
+    TextDelta,
+    ToolResultMessage,
+    UserMessage,
+)
+from quack_norris.core.llm.tool import (
+    Tool,
+    ToolCallRequest,
+    ToolResult,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,6 +44,13 @@ def _appender(lst: list) -> ...:  # type: ignore[return]
 async def _stream(*items) -> AsyncIterator:
     for item in items:
         yield item
+
+
+def _tool_result_contents(history) -> list[str]:
+    return [
+        message.content for message in history
+        if isinstance(message, ToolResultMessage)
+    ]
 
 
 class EchoTool(Tool):
@@ -117,6 +136,219 @@ async def test_tool_call_then_text() -> None:
     tool_calls = [o for o in outputs if isinstance(o, ToolCallOutput)]
     assert len(tool_calls) == 1
     assert tool_calls[0].tool_name == "echo"
+
+
+@pytest.mark.asyncio
+async def test_context_replaces_old_outputs_at_turn_start_but_defers_during_tool_loop() -> None:
+    """Turn-boundary cleanup runs once; ordinary iterations keep new output intact."""
+    tool = EchoTool()
+    old_id, old_id_2, recent_id = "old-call", "old-call-2", "recent-call"
+    old_calls = [
+        ToolCallRequest(id=call_id, name="echo", arguments={"message": "old"})
+        for call_id in (old_id, old_id_2)
+    ]
+    recent_call = ToolCallRequest(
+        id=recent_id, name="echo", arguments={"message": "recent"},
+    )
+    history = [
+        UserMessage(content="old turn"),
+        AssistantMessage(content="old work", tool_calls=old_calls),
+        ToolResultMessage(tool_call_id=old_id, content="o" * 40_000),
+        ToolResultMessage(tool_call_id=old_id_2, content="p" * 40_000),
+        UserMessage(content="recent turn"),
+        AssistantMessage(content="recent work", tool_calls=[recent_call]),
+        ToolResultMessage(tool_call_id=recent_id, content="recent output"),
+        UserMessage(content="continue"),
+    ]
+    outputs: list[AgentOutput] = []
+    snapshots: list[list[str]] = []
+    call_count = 0
+    new_output = "n" * 1_000
+
+    async def fake_converse(model, system_prompt, tools, chat_history):
+        nonlocal call_count
+        call_count += 1
+        snapshots.append(_tool_result_contents(chat_history))
+        if call_count == 1:
+            request = ToolCallRequest(
+                id="new-call", name="echo", arguments={"message": new_output},
+            )
+            request.execute = lambda **kwargs: tool.execute(**kwargs)
+            request.needs_approval = False
+            return _stream(request)
+        return _stream(TextDelta(text="Done"))
+
+    policy = ContextPolicy(
+        config=ContextManagementConfig(
+            verbatim=0.05, checkpoint_at=0.8, max_tool_output=100_000,
+        ),
+        context_window=10_000,
+    )
+    caller_history = history
+
+    with patch("quack_norris.core.agent.LLM.converse", side_effect=fake_converse):
+        await agent(
+            model="ollama/test",
+            system_prompt="sys",
+            tools=[tool],
+            chat_history=history,
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender(outputs),
+            context=policy,
+        )
+
+    assert history is caller_history
+    assert snapshots[0] == [
+        REDACTION_PLACEHOLDER, REDACTION_PLACEHOLDER, "recent output",
+    ]
+    assert snapshots[1] == [
+        REDACTION_PLACEHOLDER, REDACTION_PLACEHOLDER, "recent output", new_output,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_early_context_trigger_replaces_outputs_and_remeasures_before_checkpoint() -> None:
+    """Output redaction can bring a tool loop back under the checkpoint limit."""
+    tool = EchoTool()
+    history = [UserMessage(content="go")]
+    outputs: list[AgentOutput] = []
+    snapshots: list[list[str]] = []
+    call_count = 0
+    large_output = "x" * 28_000
+
+    async def fake_converse(model, system_prompt, tools, chat_history):
+        nonlocal call_count
+        call_count += 1
+        snapshots.append(_tool_result_contents(chat_history))
+        if call_count in (1, 2):
+            request = ToolCallRequest(
+                id=f"call-{call_count}",
+                name="echo",
+                arguments={"message": "small"},
+            )
+            request.execute = (
+                (lambda **kwargs: _return_result(large_output))
+                if call_count == 1
+                else (lambda **kwargs: _return_result("y" * 1_500))
+            )
+            request.needs_approval = False
+            return _stream(request)
+        return _stream(TextDelta(text="Done"))
+
+    policy = ContextPolicy(
+        config=ContextManagementConfig(
+            verbatim=0.5, checkpoint_at=0.8, max_tool_output=100_000,
+        ),
+        context_window=10_000,
+    )
+
+    with patch("quack_norris.core.agent.LLM.converse", side_effect=fake_converse):
+        await agent(
+            model="ollama/test",
+            system_prompt="sys",
+            tools=[tool],
+            chat_history=history,
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender(outputs),
+            context=policy,
+        )
+
+    assert snapshots[0] == []
+    assert snapshots[1] == [large_output]
+    assert snapshots[2] == [REDACTION_PLACEHOLDER, "y" * 1_500]
+    assert not any(isinstance(output, CheckpointOutput) for output in outputs)
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_fallback_after_replacement_preserves_tool_pairing() -> None:
+    """When call arguments keep usage high, fallback checkpoints safely."""
+    huge_argument = "a" * 36_000
+    old_calls = [
+        ToolCallRequest(id=call_id, name="echo", arguments={})
+        for call_id in ("old-call", "other-old")
+    ]
+    history = [
+        UserMessage(content="prior"),
+        AssistantMessage(content="old work", tool_calls=old_calls),
+        ToolResultMessage(tool_call_id="old-call", content="o" * 8_000),
+        ToolResultMessage(tool_call_id="other-old", content="p" * 8_000),
+        *[
+            message
+            for _ in range(3)
+            for message in (
+                UserMessage(content="u" * 3_500),
+                AssistantMessage(content="a" * 3_500),
+            )
+        ],
+        UserMessage(content="go"),
+    ]
+    outputs: list[AgentOutput] = []
+    snapshots: list[list[str]] = []
+    call_count = 0
+
+    async def fake_converse(model, system_prompt, tools, chat_history):
+        nonlocal call_count
+        call_count += 1
+        snapshots.append(_tool_result_contents(chat_history))
+        if call_count == 1:
+            request = ToolCallRequest(
+                id="large-args", name="echo", arguments={"message": huge_argument},
+            )
+            request.execute = lambda **kwargs: _return_result("small result")
+            request.needs_approval = False
+            return _stream(request)
+        return _stream(TextDelta(text="Done"))
+
+    policy = ContextPolicy(
+        config=ContextManagementConfig(
+            verbatim=0.05, checkpoint_at=0.8, max_tool_output=100_000,
+        ),
+        context_window=10_000,
+    )
+
+    with (
+        patch("quack_norris.core.agent.LLM.converse", side_effect=fake_converse),
+        patch(
+            "quack_norris.core.context._summarise",
+            return_value="Earlier conversation summary",
+        ),
+    ):
+        await agent(
+            model="ollama/test",
+            system_prompt="sys",
+            tools=[],
+            chat_history=history,
+            on_permission_request=AsyncMock(return_value=True),
+            on_output=_appender(outputs),
+            context=policy,
+        )
+
+    checkpoints = [
+        output for output in outputs if isinstance(output, CheckpointOutput)
+    ]
+    assert checkpoints
+    assert snapshots[0] == [REDACTION_PLACEHOLDER, REDACTION_PLACEHOLDER]
+    assert len(snapshots) == 2
+    checkpoint_messages = [
+        message for checkpoint in checkpoints for message in checkpoint.dropped
+    ]
+    all_messages = [*history, *checkpoint_messages]
+    known_calls = {
+        call.id
+        for message in all_messages
+        if isinstance(message, AssistantMessage)
+        for call in message.tool_calls
+    }
+    result_ids = {
+        message.tool_call_id
+        for message in all_messages
+        if isinstance(message, ToolResultMessage)
+    }
+    assert result_ids <= known_calls
+
+
+async def _return_result(content: str) -> ToolResult:
+    return ToolResult(content=content)
 
 
 @pytest.mark.asyncio

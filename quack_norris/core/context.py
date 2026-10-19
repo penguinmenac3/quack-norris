@@ -361,12 +361,14 @@ async def apply_context_policy(
     model: str,
     system_prompt: str,
     tools: list[Tool],
+    new_turn: bool = True,
 ) -> CheckpointOutput | None:
     """Bring *history* back within budget, mutating it in place.
 
-    Strips stale tool output first (cheap, every call), then checkpoints only
-    if utilisation is still at or above ``checkpoint_at``, summarising away
-    ``checkpoint_reduction_rate`` of the history.
+    At a new-turn boundary, strips stale tool output before evaluating the
+    checkpoint trigger. Within a turn, stripping is deferred until utilisation
+    reaches 90% of that trigger. Checkpointing uses a fresh measurement after
+    stripping and summarises only if utilisation is still at the trigger.
 
     Returns a :class:`CheckpointOutput` when a checkpoint was created, else
     ``None``.
@@ -376,12 +378,18 @@ async def apply_context_policy(
         return None
 
     usage = measure(history, system_prompt, tools, policy.context_window)
-    strip_old_tool_results(
-        history, usage.per_message, int(usage.budget * cfg.verbatim),
-    )
-    tokens_before = usage.overhead + sum(usage.per_message)
+    should_strip = new_turn or usage.utilisation >= 0.9 * cfg.checkpoint_at
+    if not should_strip and usage.utilisation < cfg.checkpoint_at:
+        return None
 
-    if tokens_before < usage.budget * cfg.checkpoint_at:
+    if should_strip:
+        strip_old_tool_results(
+            history, usage.per_message, int(usage.budget * cfg.verbatim),
+        )
+        usage = measure(history, system_prompt, tools, policy.context_window)
+    tokens_before = usage.total
+
+    if usage.utilisation < cfg.checkpoint_at:
         return None
 
     # Drop `checkpoint_reduction_rate` of the *history* (not of the window),
