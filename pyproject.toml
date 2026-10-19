@@ -22,8 +22,6 @@ dev = [
 
 [project.scripts]
 quack-norris         = "quack_norris.acp.__main__:main"
-quack-norris-manage  = "quack_norris.skills_and_agents.manage.__main__:main"
-quack-norris-sandbox = "quack_norris.sandbox:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -15,7 +15,5 @@ Quack Norris is a stateless SLM-oriented agent core with native tools, agent/ski
 | Command | Purpose |
 |---|---|
 | `quack-norris acp [--config FILE]` | Start the ACP stdio server |
-| `quack-norris-manage ...` | Install and manage agents and skills |
-| `quack-norris-sandbox ...` | Create isolated worktrees/containers |
 
-The project does not include an interactive chat client or Web UI. Use an ACP-compatible client to interact with the ACP server.
+The project does not include an interactive chat client or Web UI. Use an ACP-compatible client to interact with the ACP server. Skills and agent personas are discovered from the configured runtime locations; installation and management are handled separately.

@@ -23,7 +23,7 @@ flowchart LR
 |---|---|
 | `quack_norris.core` | Stateless model/tool loop, context management, LLM facade and provider contracts |
 | `quack_norris.tools` | Native file, shell and operation tools for direct SDK use |
-| `quack_norris.skills_and_agents` | Persona/skill discovery, skill invocation, and management commands |
+| `quack_norris.skills_and_agents` | Runtime persona/skill discovery and skill invocation |
 | `quack_norris.acp` | ACP protocol server, sessions, persistence, commands and ACP-backed tools |
 
 ## Dependency direction

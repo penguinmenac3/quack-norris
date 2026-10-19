@@ -2,14 +2,13 @@
 
 ## Package
 
-`quack_norris.skills_and_agents` owns persona discovery, skill discovery/invocation, and management commands.
+`quack_norris.skills_and_agents` discovers personas and skills for runtime use and provides skill invocation. Installation and management are provided by a separate project.
 
 ```text
 skills_and_agents/
   agent_discovery.py
   skill_discovery.py
   skill_invoke_tool.py
-  manage/
 ```
 
 ## Agent personas
@@ -45,14 +44,3 @@ sequenceDiagram
     Discovery-->>Tool: Instructions and path
     Tool-->>Model: ToolResult
 ```
-
-## Management
-
-`quack-norris-manage` points to `skills_and_agents.manage` and supports:
-
-- source management;
-- listing;
-- installation;
-- uninstallation;
-- upgrade/update;
-- manifests, cache, and global/project scopes.
