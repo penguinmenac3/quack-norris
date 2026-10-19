@@ -2,7 +2,7 @@
 name = "quack-norris"
 version = "4.0.3"
 description = "Reusable LLM + agent core for Quack Norris"
-readme = "README_PYPI.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "openai>=1.30",
